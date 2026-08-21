@@ -713,6 +713,7 @@ tbody tr:hover{ background:var(--bg-raised); }
     <div class="tabs" id="stockSubTabs">
       <button class="tab-btn active" data-subtab="quote">報價概況</button>
       <button class="tab-btn" data-subtab="kline">K線</button>
+      <button class="tab-btn" data-subtab="compare">多股比較</button>
       <button class="tab-btn" data-subtab="institutional">法人進出</button>
       <button class="tab-btn" data-subtab="margin">融資融券</button>
       <button class="tab-btn" data-subtab="holders">大戶</button>
@@ -759,6 +760,29 @@ tbody tr:hover{ background:var(--bg-raised); }
 
       <div class="table-wrap" style="padding:16px;overflow-x:auto;">
         <div id="klineChartContainer"><div class="empty-state">輸入股票代號查詢K線圖。</div></div>
+      </div>
+    </div>
+
+    <div class="stock-subpanel" id="subpanel-compare">
+      <div class="add-form">
+        <input id="compareCodeInput" placeholder="股票代號 例如 2454" maxlength="6">
+        <button id="compareAddBtn">加入比較</button>
+      </div>
+
+      <div class="tabs" id="comparePeriodTabs">
+        <button class="tab-btn" data-months="3">3個月</button>
+        <button class="tab-btn active" data-months="6">6個月</button>
+        <button class="tab-btn" data-months="12">1年</button>
+      </div>
+
+      <div id="compareChips" style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;"></div>
+
+      <button id="compareUpdateBtn" class="primary">更新比較圖</button>
+
+      <div class="proxy-status" id="compareStatus"></div>
+
+      <div class="table-wrap" style="padding:16px;overflow-x:auto;margin-top:12px;">
+        <div id="compareChartContainer"><div class="empty-state">加入至少一支股票（例如目前查詢的這支已經自動加入），按「更新比較圖」查看走勢比較。</div></div>
       </div>
     </div>
 
@@ -1208,6 +1232,181 @@ document.getElementById('stockQueryBtn').addEventListener('click', () => {
   queryStock(code);
 });
 
+// ---------- K線多股比較 ----------
+let compareList = []; // 股票代號陣列，最多5檔
+let compareMonths = 6;
+const compareColors = ['#5EC8D8', '#C9A227', '#B57EDC', '#E8965A', '#7FD858'];
+
+function addToCompare(code){
+  if(!code || compareList.includes(code)) return;
+  if(compareList.length >= 5){
+    return; // 超過5檔就不自動加入，避免圖太亂
+  }
+  compareList.push(code);
+  renderCompareChips();
+}
+
+function renderCompareChips(){
+  const container = document.getElementById('compareChips');
+  if(compareList.length === 0){
+    container.innerHTML = '<span style="font-size:12px;color:var(--text-tertiary);">尚未加入任何股票（最多5檔）</span>';
+    return;
+  }
+  container.innerHTML = compareList.map((code, i) => `
+    <span class="tag" style="display:flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid ${compareColors[i]};color:${compareColors[i]};">
+      ${code}
+      <button data-code="${code}" style="background:none;border:none;color:inherit;cursor:pointer;font-size:12px;padding:0;">✕</button>
+    </span>`).join('');
+
+  container.querySelectorAll('button[data-code]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      compareList = compareList.filter(c => c !== btn.dataset.code);
+      renderCompareChips();
+    });
+  });
+}
+
+document.getElementById('compareAddBtn').addEventListener('click', () => {
+  const input = document.getElementById('compareCodeInput');
+  const code = input.value.trim();
+  if(!code) return;
+  if(compareList.length >= 5){
+    alert('最多只能比較5檔股票，請先移除一檔再加入。');
+    return;
+  }
+  addToCompare(code);
+  input.value = '';
+});
+
+document.getElementById('comparePeriodTabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('.tab-btn');
+  if(!btn) return;
+  compareMonths = parseInt(btn.dataset.months, 10);
+  document.querySelectorAll('#comparePeriodTabs .tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+});
+
+function setCompareStatus(text, kind){
+  const el = document.getElementById('compareStatus');
+  el.textContent = text;
+  el.className = 'proxy-status' + (kind ? ' ' + kind : '');
+}
+
+document.getElementById('compareUpdateBtn').addEventListener('click', async () => {
+  if(!proxyUrl){
+    setCompareStatus('請先在「個人存股表現」區塊貼上並儲存 GAS proxy 網址。', 'error');
+    return;
+  }
+  if(compareList.length === 0){
+    setCompareStatus('請先加入至少一支股票。', 'error');
+    return;
+  }
+
+  setCompareStatus('抓取中...（' + compareList.length + ' 檔股票，可能需要一些時間）', '');
+  document.getElementById('compareChartContainer').innerHTML = '<div class="empty-state">抓取中...</div>';
+
+  try{
+    const results = await Promise.all(compareList.map(async (code) => {
+      const url = proxyUrl + '?type=kline&code=' + encodeURIComponent(code) + '&months=' + compareMonths;
+      const data = await fetchViaJsonp(url, 30000);
+      return { code, data };
+    }));
+
+    const series = [];
+    const failed = [];
+    results.forEach(r => {
+      if(r.data.error || !r.data.data || r.data.data.length === 0){
+        failed.push(r.code);
+      }else{
+        series.push({ code: r.code, name: r.data.code || r.code, rows: r.data.data });
+      }
+    });
+
+    if(series.length === 0){
+      setCompareStatus('查無資料：' + failed.join('、'), 'error');
+      return;
+    }
+
+    renderCompareChart(series);
+    setCompareStatus(
+      '已更新' + (failed.length > 0 ? '（' + failed.join('、') + ' 查無資料，未顯示）' : ''),
+      failed.length > 0 ? 'error' : 'ok'
+    );
+  }catch(err){
+    setCompareStatus('抓取失敗：' + err.message, 'error');
+  }
+});
+
+function renderCompareChart(series){
+  const container = document.getElementById('compareChartContainer');
+
+  // 找出所有股票共同的日期交集，這樣才能對齊比較（不同股票停牌日不同）
+  const allDates = series.map(s => new Set(s.rows.map(r => r.date)));
+  let commonDates = [...allDates[0]].filter(d => allDates.every(set => set.has(d)));
+  commonDates.sort();
+
+  if(commonDates.length < 2){
+    container.innerHTML = '<div class="empty-state">這幾檔股票沒有足夠的共同交易日可以比較。</div>';
+    return;
+  }
+
+  const w = Math.max(680, commonDates.length * 6);
+  const h = 320;
+  const padLeft = 60, padRight = 14, padTop = 20, padBottom = 30;
+  const plotW = w - padLeft - padRight;
+  const plotH = h - padTop - padBottom;
+
+  // 每檔股票都換算成「相對於第一天的漲跌幅%」
+  const normalizedSeries = series.map((s, i) => {
+    const rowByDate = {};
+    s.rows.forEach(r => { rowByDate[r.date] = r; });
+    const baseClose = rowByDate[commonDates[0]].close;
+    const points = commonDates.map(d => ({
+      date: d,
+      pct: (rowByDate[d].close - baseClose) / baseClose * 100
+    }));
+    return { code: s.code, name: s.name, color: compareColors[i % compareColors.length], points };
+  });
+
+  const allPct = normalizedSeries.flatMap(s => s.points.map(p => p.pct));
+  const maxAbs = Math.max(...allPct.map(Math.abs), 1);
+  const zeroY = padTop + plotH / 2;
+  const yFor = (v) => zeroY - (v / maxAbs) * (plotH / 2);
+  const xFor = (i) => padLeft + (i / (commonDates.length - 1)) * plotW;
+
+  let gridHtml = '';
+  [-maxAbs, -maxAbs/2, 0, maxAbs/2, maxAbs].forEach(v => {
+    const y = yFor(v);
+    gridHtml += `<line x1="${padLeft}" y1="${y}" x2="${w-padRight}" y2="${y}" stroke="#2C303C" stroke-width="1"/>`;
+    gridHtml += `<text x="${padLeft-8}" y="${y+4}" font-size="10" fill="#8B90A3" font-family="'IBM Plex Mono', monospace" text-anchor="end">${v>0?'+':''}${v.toFixed(1)}%</text>`;
+  });
+
+  const idxs = [0, Math.floor(commonDates.length/2), commonDates.length-1];
+  let xLabels = '';
+  idxs.forEach(i => {
+    xLabels += `<text x="${xFor(i)}" y="${h-10}" font-size="10" fill="#8B90A3" font-family="'IBM Plex Mono', monospace" text-anchor="middle">${commonDates[i].slice(5)}</text>`;
+  });
+
+  const linesHtml = normalizedSeries.map(s => {
+    const pts = s.points.map((p, i) => xFor(i) + ',' + yFor(p.pct)).join(' ');
+    return `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2"/>`;
+  }).join('');
+
+  const legendHtml = normalizedSeries.map(s => {
+    const lastPct = s.points[s.points.length - 1].pct;
+    return `<span style="color:${s.color};margin-right:16px;">— ${s.name}（${s.code}）${lastPct > 0 ? '+' : ''}${lastPct.toFixed(2)}%</span>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div style="margin-bottom:10px;font-size:12px;font-family:'IBM Plex Mono', monospace;">${legendHtml}</div>
+    <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block;">
+      ${gridHtml}
+      ${linesHtml}
+      ${xLabels}
+    </svg>
+    <div style="margin-top:6px;font-size:11px;color:var(--text-tertiary);">縱軸為相對於期初（${commonDates[0]}）的累積漲跌幅%，只取各股票共同的交易日對齊比較。</div>`;
+}
+
+
 function queryStock(code){
   document.getElementById('stockCodeInput').value = code;
   klineCurrentCode = code;
@@ -1215,6 +1414,7 @@ function queryStock(code){
   fetchKline(code);
   fetchInstitutional(code);
   fetchFundamental(code);
+  addToCompare(code);
 }
 
 // ---------- 帳號系統 ----------
@@ -3265,6 +3465,7 @@ function renderHoldingsDigest(list){
   });
 }
 
+renderCompareChips();
 renderTicker();
 renderIndices();
 renderTrending();
