@@ -1,0 +1,2962 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>台股觀察台</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root{
+  --bg-base:#12141B;
+  --bg-surface:#1A1D26;
+  --bg-raised:#232631;
+  --hairline:#2C303C;
+  --text-primary:#ECEDF2;
+  --text-secondary:#8B90A3;
+  --text-tertiary:#5B6072;
+  --accent:#C9A227;
+  --accent-dim:#8A711E;
+  --up:#E0392C;
+  --up-bg:rgba(224,57,44,0.12);
+  --down:#1FA35A;
+  --down-bg:rgba(31,163,90,0.12);
+  --font-sans:'Noto Sans TC', sans-serif;
+  --font-mono:'IBM Plex Mono', monospace;
+}
+
+*{ box-sizing:border-box; margin:0; padding:0; }
+
+body{
+  background:var(--bg-base);
+  color:var(--text-primary);
+  font-family:var(--font-sans);
+  padding:0 0 3rem;
+  min-height:100vh;
+}
+
+.page{ max-width:1300px; margin:0 auto; padding:0 1.5rem; }
+
+.app-layout{
+  display:flex;
+  align-items:flex-start;
+  gap:24px;
+}
+.sidebar{
+  flex:0 0 200px;
+  position:sticky;
+  top:16px;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  background:var(--bg-surface);
+  border:1px solid var(--hairline);
+  border-radius:10px;
+  padding:8px;
+  align-self:flex-start;
+}
+.nav-item{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  background:none;
+  border:none;
+  color:var(--text-secondary);
+  text-align:left;
+  padding:10px 10px;
+  border-radius:6px;
+  font-size:13px;
+  font-family:var(--font-sans);
+  cursor:pointer;
+  white-space:nowrap;
+}
+.nav-item .nav-num{
+  font-family:var(--font-mono);
+  font-size:11px;
+  color:var(--text-tertiary);
+}
+.nav-item:hover{ background:var(--bg-raised); color:var(--text-primary); }
+.nav-item.active{
+  background:var(--bg-raised);
+  color:var(--accent);
+  font-weight:700;
+}
+.nav-item.active .nav-num{ color:var(--accent); }
+.content-area{ flex:1; min-width:0; }
+.page-section{ display:none; }
+.page-section.active{ display:block; }
+
+@media (max-width: 760px){
+  .app-layout{ flex-direction:column; }
+  .sidebar{
+    flex-direction:row;
+    overflow-x:auto;
+    position:static;
+    width:100%;
+    flex:0 0 auto;
+  }
+  .nav-item{ flex:0 0 auto; }
+}
+
+/* ---------- Ticker tape (signature element) ---------- */
+.ticker-wrap{
+  background:var(--bg-surface);
+  border-bottom:1px solid var(--hairline);
+  overflow:hidden;
+  white-space:nowrap;
+  padding:10px 0;
+  margin-bottom:2rem;
+}
+.ticker-track{
+  display:inline-flex;
+  gap:2.5rem;
+  animation:scroll-left 32s linear infinite;
+  padding-left:100%;
+}
+@media (prefers-reduced-motion: reduce){
+  .ticker-track{ animation:none; padding-left:1.5rem; }
+}
+@keyframes scroll-left{
+  from{ transform:translateX(0); }
+  to{ transform:translateX(-50%); }
+}
+.ticker-item{
+  font-family:var(--font-mono);
+  font-size:13px;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  color:var(--text-secondary);
+}
+.ticker-item .name{ color:var(--text-primary); font-weight:500; }
+.ticker-up{ color:var(--up); }
+.ticker-down{ color:var(--down); }
+
+/* ---------- Header ---------- */
+.masthead{
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  margin-bottom:0.5rem;
+}
+.masthead h1{
+  font-size:22px;
+  font-weight:900;
+  letter-spacing:0.5px;
+}
+.masthead .updated{
+  font-family:var(--font-mono);
+  font-size:12px;
+  color:var(--text-tertiary);
+}
+.demo-banner{
+  font-size:12px;
+  color:var(--text-tertiary);
+  border:1px dashed var(--hairline);
+  border-radius:6px;
+  padding:8px 12px;
+  margin-bottom:2.5rem;
+  line-height:1.6;
+}
+.demo-banner b{ color:var(--accent); font-weight:500; }
+
+/* ---------- Section headers ---------- */
+.section{ margin-bottom:3rem; }
+.section-head{
+  display:flex;
+  align-items:baseline;
+  gap:10px;
+  margin-bottom:1rem;
+  padding-bottom:0.6rem;
+  border-bottom:1px solid var(--hairline);
+}
+.section-eyebrow{
+  font-family:var(--font-mono);
+  font-size:11px;
+  color:var(--accent);
+  letter-spacing:1.5px;
+}
+.section-head h2{ font-size:17px; font-weight:700; }
+
+/* ---------- Index cards (大盤表現) ---------- */
+.index-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+  gap:12px;
+}
+.index-card{
+  background:var(--bg-surface);
+  border:1px solid var(--hairline);
+  border-radius:10px;
+  padding:14px 16px;
+}
+.index-card .name{ font-size:13px; color:var(--text-secondary); margin-bottom:8px; }
+.index-card .value-row{ display:flex; align-items:baseline; gap:10px; margin-bottom:6px; }
+.index-card .value{ font-family:var(--font-mono); font-size:22px; font-weight:600; }
+.index-card .delta{ font-family:var(--font-mono); font-size:13px; font-weight:500; }
+.index-card svg{ display:block; margin-top:4px; }
+
+/* ---------- Trending stocks table (話題個股表現) ---------- */
+.table-wrap{
+  background:var(--bg-surface);
+  border:1px solid var(--hairline);
+  border-radius:10px;
+  overflow:hidden;
+}
+table{ width:100%; border-collapse:collapse; }
+th{
+  text-align:left;
+  font-size:12px;
+  font-weight:500;
+  color:var(--text-tertiary);
+  padding:10px 14px;
+  border-bottom:1px solid var(--hairline);
+}
+td{
+  padding:12px 14px;
+  font-size:14px;
+  border-bottom:1px solid var(--hairline);
+}
+tr:last-child td{ border-bottom:none; }
+tbody tr:hover{ background:var(--bg-raised); }
+.clickable-row{ cursor:pointer; }
+.clickable-row:hover td{ color:var(--text-primary); }
+.clickable-row:hover .code{ color:var(--accent); }
+.code{ font-family:var(--font-mono); color:var(--text-secondary); font-size:12px; }
+.num{ font-family:var(--font-mono); text-align:right; }
+.tag{
+  display:inline-block;
+  font-size:11px;
+  padding:2px 8px;
+  border-radius:5px;
+  background:var(--bg-raised);
+  color:var(--text-secondary);
+}
+.up-text{ color:var(--up); }
+.down-text{ color:var(--down); }
+
+/* ---------- Personal holdings (個人存股表現) ---------- */
+.totals-row{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));
+  gap:12px;
+  margin-bottom:1rem;
+}
+.total-card{
+  background:var(--bg-surface);
+  border:1px solid var(--hairline);
+  border-radius:10px;
+  padding:12px 16px;
+}
+.total-card .label{ font-size:12px; color:var(--text-secondary); margin-bottom:6px; }
+.total-card .value{ font-family:var(--font-mono); font-size:20px; font-weight:600; }
+
+.add-form{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  background:var(--bg-surface);
+  border:1px solid var(--hairline);
+  border-radius:10px;
+  padding:14px;
+  margin-top:12px;
+}
+.add-form input{
+  background:var(--bg-raised);
+  border:1px solid var(--hairline);
+  color:var(--text-primary);
+  border-radius:6px;
+  padding:8px 10px;
+  font-family:var(--font-mono);
+  font-size:13px;
+  width:110px;
+}
+.add-form input::placeholder{ color:var(--text-tertiary); font-family:var(--font-sans); }
+.add-form button{
+  background:var(--accent);
+  color:#1A1500;
+  border:none;
+  border-radius:6px;
+  padding:8px 16px;
+  font-family:var(--font-sans);
+  font-weight:700;
+  font-size:13px;
+  cursor:pointer;
+}
+.add-form button:hover{ background:#DBB233; }
+.del-btn{
+  background:none;
+  border:1px solid var(--hairline);
+  color:var(--text-tertiary);
+  border-radius:5px;
+  font-size:11px;
+  padding:3px 8px;
+  cursor:pointer;
+}
+.del-btn:hover{ color:var(--up); border-color:var(--up); }
+.empty-state{
+  padding:2rem;
+  text-align:center;
+  color:var(--text-tertiary);
+  font-size:13px;
+}
+
+.proxy-settings{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  align-items:center;
+  background:var(--bg-surface);
+  border:1px solid var(--hairline);
+  border-radius:10px;
+  padding:12px 14px;
+  margin-bottom:12px;
+}
+.proxy-settings input{
+  flex:1;
+  min-width:220px;
+  background:var(--bg-raised);
+  border:1px solid var(--hairline);
+  color:var(--text-primary);
+  border-radius:6px;
+  padding:8px 10px;
+  font-family:var(--font-mono);
+  font-size:12px;
+}
+.proxy-settings input::placeholder{ color:var(--text-tertiary); font-family:var(--font-sans); }
+.proxy-settings button{
+  background:var(--bg-raised);
+  border:1px solid var(--hairline);
+  color:var(--text-primary);
+  border-radius:6px;
+  padding:8px 14px;
+  font-family:var(--font-sans);
+  font-size:13px;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.proxy-settings button:hover{ border-color:var(--accent); }
+.proxy-settings button.primary{
+  background:var(--accent);
+  color:#1A1500;
+  font-weight:700;
+  border:none;
+}
+.proxy-settings button.primary:hover{ background:#DBB233; }
+.proxy-status{
+  font-size:12px;
+  color:var(--text-tertiary);
+  margin-bottom:1rem;
+}
+.tabs{
+  display:flex;
+  gap:6px;
+  padding:10px 14px 0;
+}
+.tab-btn{
+  background:none;
+  border:1px solid var(--hairline);
+  color:var(--text-secondary);
+  border-radius:6px;
+  padding:6px 14px;
+  font-family:var(--font-sans);
+  font-size:13px;
+  cursor:pointer;
+}
+.tab-btn.active{
+  background:var(--bg-raised);
+  color:var(--accent);
+  border-color:var(--accent-dim);
+  font-weight:700;
+}
+.tab-btn:hover{ color:var(--text-primary); }
+
+.ma-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
+  gap:12px;
+}
+.ma-card{
+  background:var(--bg-surface);
+  border:1px solid var(--hairline);
+  border-radius:10px;
+  padding:12px 14px;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.ma-card .ma-label{ font-weight:700; font-family:var(--font-mono); font-size:13px; }
+.ma-card .ma-value{ font-family:var(--font-mono); font-size:18px; }
+.ma-card .ma-status{ font-size:12px; }
+.ma-alert-btn{
+  background:var(--bg-raised);
+  border:1px solid var(--hairline);
+  color:var(--text-secondary);
+  border-radius:6px;
+  padding:5px 12px;
+  font-size:12px;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.ma-alert-btn:hover{ border-color:var(--accent); }
+.ma-alert-btn.active{
+  background:rgba(201,162,39,0.15);
+  border-color:var(--accent);
+  color:var(--accent);
+}
+
+#globalAlertBanner{
+  background:rgba(201,162,39,0.1);
+  border:1px solid var(--accent-dim);
+  border-radius:10px;
+  padding:14px 16px;
+  margin-bottom:1.5rem;
+}
+.global-alert-item{
+  font-size:14px;
+  padding:4px 0;
+  color:var(--text-primary);
+}
+#dismissAlertBanner{
+  margin-top:8px;
+  background:none;
+  border:1px solid var(--hairline);
+  color:var(--text-secondary);
+  border-radius:6px;
+  padding:5px 12px;
+  font-size:12px;
+  cursor:pointer;
+}
+
+.cal-nav{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  margin-bottom:10px;
+}
+.cal-nav #calMonthLabel{
+  font-family:var(--font-mono);
+  font-size:14px;
+  font-weight:700;
+  min-width:90px;
+  text-align:center;
+}
+.calendar-grid{
+  display:grid;
+  grid-template-columns:repeat(7, 1fr);
+  gap:4px;
+}
+.cal-weekday{
+  text-align:center;
+  font-size:11px;
+  color:var(--text-tertiary);
+  padding:4px 0;
+}
+.cal-cell{
+  min-height:64px;
+  background:var(--bg-surface);
+  border:1px solid var(--hairline);
+  border-radius:6px;
+  padding:4px 5px;
+  cursor:pointer;
+}
+.cal-cell.empty{ background:none; border:none; cursor:default; }
+.cal-cell:hover:not(.empty){ border-color:var(--accent-dim); }
+.cal-cell.today{ border-color:var(--accent); }
+.cal-cell.selected{ background:var(--bg-raised); border-color:var(--accent); }
+.cal-day-num{ font-family:var(--font-mono); font-size:12px; color:var(--text-secondary); }
+.cal-chips{ display:flex; flex-wrap:wrap; gap:2px; margin-top:3px; }
+.cal-chip{
+  font-size:9px;
+  font-family:var(--font-mono);
+  background:rgba(201,162,39,0.15);
+  color:var(--accent);
+  border-radius:3px;
+  padding:1px 3px;
+}
+.cal-chip-more{ font-size:9px; color:var(--text-tertiary); padding:1px 2px; }
+
+@media (max-width: 760px){
+  .cal-cell{ min-height:48px; }
+  .cal-chip{ display:none; }
+}
+
+.holder-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+  gap:12px;
+  margin-bottom:12px;
+}
+.holder-card{
+  background:var(--bg-surface);
+  border:1px solid var(--hairline);
+  border-radius:10px;
+  padding:14px 16px;
+}
+.holder-card .label{ font-size:12px; color:var(--text-secondary); margin-bottom:6px; }
+.holder-card .value{ font-family:var(--font-mono); font-size:22px; font-weight:600; }
+.holder-card .sub{ font-size:11px; color:var(--text-tertiary); margin-top:4px; }
+.bracket-bars{
+  display:flex;
+  align-items:flex-end;
+  gap:3px;
+  height:60px;
+  padding:8px 0;
+}
+.bracket-bar{
+  flex:1;
+  background:var(--accent-dim);
+  border-radius:2px 2px 0 0;
+  min-height:2px;
+}
+.bracket-bar.big{ background:var(--up); }
+
+.proxy-status.error{ color:var(--up); }
+.proxy-status.ok{ color:var(--down); }
+</style>
+</head>
+<body>
+
+<div class="ticker-wrap">
+  <div class="ticker-track" id="tickerTrack"></div>
+</div>
+
+<div class="page">
+
+  <div class="masthead">
+    <h1>台股觀察台</h1>
+    <div class="updated" id="updatedTime"></div>
+  </div>
+  <div class="demo-banner">
+    <b>資料狀態</b>：貼上 GAS proxy 網址並儲存後，大盤指數、話題個股、漲跌幅排行、個人存股、關注股票會一起更新。話題個股的「全部/個股/ETF」是證交所盤後公布的成交量前 20 名；「漲幅排行/跌幅排行」是全市場（僅上市，扣除成交量過低的冷門股）漲跌幅排行，兩者都是收盤後更新，不是逐秒跳動的即時排行。尚未設定網址或抓取失敗時會自動顯示示範資料。
+  </div>
+
+  <div id="globalAlertBanner" style="display:none;"></div>
+
+  <div class="app-layout">
+    <nav class="sidebar" id="sidebarNav">
+      <button class="nav-item active" data-target="section-market"><span class="nav-num">01</span>大盤表現</button>
+      <button class="nav-item" data-target="section-trending"><span class="nav-num">02</span>話題個股表現</button>
+      <button class="nav-item" data-target="section-holdings"><span class="nav-num">03</span>個人存股表現</button>
+      <button class="nav-item" data-target="section-watchlist"><span class="nav-num">04</span>關注股票</button>
+      <button class="nav-item" data-target="klineSection"><span class="nav-num">05</span>K線圖</button>
+      <button class="nav-item" data-target="institutionalSection"><span class="nav-num">06</span>法人籌碼＋大戶狀況</button>
+      <button class="nav-item" data-target="calendarSection"><span class="nav-num">07</span>台股行事曆</button>
+      <button class="nav-item" data-target="strategySection"><span class="nav-num">08</span>策略選股</button>
+    </nav>
+
+    <div class="content-area">
+
+  <div class="section page-section active" id="section-market">
+    <div class="section-head">
+      <span class="section-eyebrow">01</span>
+      <h2>大盤表現</h2>
+    </div>
+    <div class="index-grid" id="indexGrid"></div>
+  </div>
+
+  <div class="section page-section" id="section-trending">
+    <div class="section-head">
+      <span class="section-eyebrow">02</span>
+      <h2>話題個股表現</h2>
+    </div>
+    <div class="table-wrap">
+      <div class="tabs" id="trendingTabs">
+        <button class="tab-btn active" data-filter="all">全部（成交量）</button>
+        <button class="tab-btn" data-filter="股票">個股</button>
+        <button class="tab-btn" data-filter="ETF">ETF</button>
+        <button class="tab-btn" data-filter="gainers">漲幅排行</button>
+        <button class="tab-btn" data-filter="losers">跌幅排行</button>
+        <button class="tab-btn" data-filter="inst_buy">法人買超</button>
+        <button class="tab-btn" data-filter="inst_sell">法人賣超</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>股票</th>
+            <th class="num">現價</th>
+            <th class="num">漲跌幅</th>
+            <th class="num">成交張數</th>
+            <th>標籤</th>
+          </tr>
+        </thead>
+        <tbody id="trendingBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section page-section" id="section-holdings">
+    <div class="section-head">
+      <span class="section-eyebrow">03</span>
+      <h2>個人存股表現</h2>
+    </div>
+
+    <div class="proxy-settings">
+      <input id="proxyUrlInput" placeholder="貼上 GAS Proxy 部署網址 例如 https://script.google.com/macros/s/xxx/exec">
+      <button id="saveProxyBtn">儲存網址</button>
+      <button id="refreshPricesBtn" class="primary">重新整理全部資料</button>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-secondary);cursor:pointer;">
+        <input type="checkbox" id="autoRefreshToggle">
+        自動更新（60秒）
+      </label>
+    </div>
+    <div class="proxy-status" id="proxyStatus"></div>
+
+    <div id="authPanel" style="margin-bottom:20px;">
+      <div class="table-wrap" style="padding:16px;">
+        <div class="tabs" id="authTabs">
+          <button class="tab-btn active" data-mode="login">登入</button>
+          <button class="tab-btn" data-mode="register">註冊新帳號</button>
+        </div>
+        <div class="add-form" style="margin-top:12px;">
+          <input id="authUsername" placeholder="帳號" maxlength="30">
+          <input id="authPassword" type="password" placeholder="密碼" maxlength="60">
+          <button id="authSubmitBtn" class="primary">登入</button>
+        </div>
+        <div class="proxy-status" id="authStatus"></div>
+        <div style="font-size:11px;color:var(--text-tertiary);margin-top:6px;">帳號密碼會存在你自己的 GAS 後端（不是第三方伺服器），密碼經過雜湊處理後才傳送，但這是給親友使用的輕量方案，不是銀行等級的安全性，請不要用你其他重要帳號的密碼。</div>
+      </div>
+    </div>
+
+    <div id="loggedInPanel" style="display:none;margin-bottom:20px;">
+      <div class="table-wrap" style="padding:12px 16px;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:13px;">已登入：<b id="loggedInUsername" style="color:var(--accent);"></b></span>
+        <button id="logoutBtn" class="tab-btn">登出</button>
+      </div>
+    </div>
+
+    <div id="holdingsGate">
+    <div class="empty-state">請先登入才能使用個人存股表現、關注股票、均線提醒功能。</div>
+    </div>
+
+    <div id="holdingsContent" style="display:none;">
+
+    <div class="totals-row" id="totalsRow"></div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>股票</th>
+            <th class="num">股數</th>
+            <th class="num">成本價</th>
+            <th class="num">現價</th>
+            <th class="num">損益</th>
+            <th class="num">報酬率</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="holdingsBody"></tbody>
+      </table>
+    </div>
+
+    <div class="add-form">
+      <input id="inputCode" placeholder="代號 例如 2330" maxlength="6">
+      <input id="inputShares" placeholder="股數" type="number" min="1">
+      <input id="inputCost" placeholder="成本價" type="number" step="0.01" min="0">
+      <button id="addBtn">新增持股</button>
+    </div>
+
+    </div>
+  </div>
+
+  <div class="section page-section" id="section-watchlist">
+    <div class="section-head">
+      <span class="section-eyebrow">04</span>
+      <h2>關注股票</h2>
+    </div>
+
+    <div id="watchlistGate">
+      <div class="empty-state">請先到「03 個人存股表現」登入帳號，才能使用關注股票功能。</div>
+    </div>
+
+    <div id="watchlistContent" style="display:none;">
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>股票</th>
+            <th class="num">現價</th>
+            <th class="num">漲跌幅</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="watchlistBody"></tbody>
+      </table>
+    </div>
+
+    <div class="add-form">
+      <input id="watchInputCode" placeholder="代號 例如 2330" maxlength="6">
+      <button id="watchAddBtn">加入關注</button>
+    </div>
+
+    </div>
+  </div>
+
+  <div class="section page-section" id="klineSection">
+    <div class="section-head">
+      <span class="section-eyebrow">05</span>
+      <h2>K線圖</h2>
+    </div>
+
+    <div class="add-form">
+      <input id="klineCodeInput" placeholder="股票代號 例如 2330（僅支援上市股票）" maxlength="6">
+      <button id="klineBtn" class="primary">查詢K線</button>
+    </div>
+
+    <div class="tabs" id="klinePeriodTabs">
+      <button class="tab-btn" data-months="3">3個月</button>
+      <button class="tab-btn active" data-months="6">6個月</button>
+      <button class="tab-btn" data-months="12">1年</button>
+      <button class="tab-btn" data-months="24">2年</button>
+    </div>
+
+    <div class="tabs" id="klineTypeTabs">
+      <button class="tab-btn active" data-type="day">日K</button>
+      <button class="tab-btn" data-type="week">週K</button>
+      <button class="tab-btn" data-type="month">月K</button>
+    </div>
+
+    <div class="tabs" id="klineMaTabs">
+      <button class="tab-btn ma-toggle active" data-ma="5" style="border-color:#5EC8D8;color:#5EC8D8;">MA5</button>
+      <button class="tab-btn ma-toggle active" data-ma="10" style="border-color:#C9A227;color:#C9A227;">MA10</button>
+      <button class="tab-btn ma-toggle" data-ma="30" style="border-color:#B57EDC;color:#B57EDC;">MA30</button>
+      <button class="tab-btn ma-toggle" data-ma="60" style="border-color:#E8965A;color:#E8965A;">MA60</button>
+    </div>
+
+    <div class="tabs" id="klineIndicatorTabs">
+      <button class="tab-btn" data-indicator="none">不顯示副圖</button>
+      <button class="tab-btn active" data-indicator="kd">KD</button>
+      <button class="tab-btn" data-indicator="macd">MACD</button>
+      <button class="tab-btn" data-indicator="rsi">RSI</button>
+    </div>
+
+    <div class="proxy-status" id="klineStatus"></div>
+    <div style="margin-bottom:12px;">
+      <button id="jumpToInstBtn" class="tab-btn">查看這支股票的法人籌碼 →</button>
+    </div>
+
+    <div id="klineMaPanel" style="margin-bottom:12px;"></div>
+
+    <div class="table-wrap" style="padding:16px;overflow-x:auto;">
+      <div id="klineChartContainer"><div class="empty-state">輸入股票代號查詢K線圖。</div></div>
+    </div>
+  </div>
+
+  <div class="section page-section" id="institutionalSection">
+    <div class="section-head">
+      <span class="section-eyebrow">06</span>
+      <h2>法人籌碼＋大戶狀況</h2>
+    </div>
+
+    <div class="add-form">
+      <input id="instCodeInput" placeholder="股票代號 例如 2330（僅支援上市股票）" maxlength="6">
+      <button id="instBtn" class="primary">查詢籌碼</button>
+    </div>
+
+    <div class="proxy-status" id="instStatus"></div>
+
+    <div id="instHolderPanel" style="margin-bottom:16px;"></div>
+
+    <div class="table-wrap" style="padding:16px;overflow-x:auto;margin-bottom:16px;">
+      <div id="instChartContainer"><div class="empty-state">查詢後會顯示三大法人買賣超圖表。</div></div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>日期</th>
+            <th class="num">外資</th>
+            <th class="num">投信</th>
+            <th class="num">自營商</th>
+            <th class="num">合計</th>
+          </tr>
+        </thead>
+        <tbody id="instBody"><tr><td colspan="5"><div class="empty-state">輸入股票代號查詢近10日三大法人買賣超。</div></td></tr></tbody>
+      </table>
+    </div>
+
+    <div style="margin:20px 0 10px;font-size:13px;font-weight:700;color:var(--accent);">基本資料 ＋ 外資持股比率</div>
+    <div id="basicInfoPanel" class="table-wrap" style="padding:14px 16px;"><div class="empty-state">查詢股票代號後顯示基本資料。</div></div>
+
+    <div style="margin:20px 0 10px;font-size:13px;font-weight:700;color:var(--accent);">融資融券（近10個交易日）</div>
+    <div class="table-wrap" style="padding:16px;overflow-x:auto;margin-bottom:16px;">
+      <div id="marginChartContainer"><div class="empty-state">查詢後顯示融資融券變化圖。</div></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>日期</th>
+            <th class="num">融資買進</th>
+            <th class="num">融資賣出</th>
+            <th class="num">融資餘額</th>
+            <th class="num">融券買進</th>
+            <th class="num">融券賣出</th>
+            <th class="num">融券餘額</th>
+          </tr>
+        </thead>
+        <tbody id="marginBody"><tr><td colspan="7"><div class="empty-state">輸入股票代號查詢融資融券。</div></td></tr></tbody>
+      </table>
+    </div>
+
+    <div style="margin:20px 0 10px;font-size:13px;font-weight:700;color:var(--accent);">除權息（股利分派情形）</div>
+    <div class="table-wrap" style="overflow-x:auto;">
+      <div id="dividendsContainer"><div class="empty-state">查詢後顯示股利分派紀錄。</div></div>
+    </div>
+
+    <div style="margin:20px 0 10px;font-size:13px;font-weight:700;color:var(--accent);">月營收</div>
+    <div class="table-wrap" style="overflow-x:auto;">
+      <div id="revenueContainer"><div class="empty-state">查詢後顯示近12個月營收。</div></div>
+    </div>
+  </div>
+
+  <div class="section page-section" id="calendarSection">
+    <div class="section-head">
+      <span class="section-eyebrow">07</span>
+      <h2>台股行事曆 － 除權息</h2>
+    </div>
+
+    <div class="add-form">
+      <input id="calendarCodeInput" placeholder="股票代號（留空看全部） 例如 2330" maxlength="6">
+      <button id="calendarBtn" class="primary">查詢除權息日曆</button>
+    </div>
+
+    <div class="proxy-status" id="calendarStatus"></div>
+
+    <div class="tabs" id="calendarViewTabs">
+      <button class="tab-btn active" data-view="grid">月曆檢視</button>
+      <button class="tab-btn" data-view="list">清單檢視</button>
+    </div>
+
+    <div id="calendarGridView">
+      <div class="cal-nav">
+        <button id="calPrevMonth" class="tab-btn">‹</button>
+        <span id="calMonthLabel"></span>
+        <button id="calNextMonth" class="tab-btn">›</button>
+      </div>
+      <div class="calendar-grid" id="calendarGrid"></div>
+    </div>
+
+    <div class="tabs" id="calendarRangeTabs" style="display:none;">
+      <button class="tab-btn active" data-days="30">未來30天</button>
+      <button class="tab-btn" data-days="60">未來60天</button>
+      <button class="tab-btn" data-days="9999">全部</button>
+    </div>
+
+    <div style="margin-top:12px;font-size:12px;color:var(--text-tertiary);" id="calendarDayLabel">點選月曆上的日期，查看當天的除權息股票</div>
+
+    <div class="table-wrap" style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>日期</th>
+            <th>代號</th>
+            <th>名稱</th>
+            <th>類型</th>
+            <th class="num">現金股利</th>
+            <th class="num">無償配股率</th>
+          </tr>
+        </thead>
+        <tbody id="calendarBody"><tr><td colspan="6"><div class="empty-state">按「查詢除權息日曆」載入資料。</div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section page-section" id="strategySection">
+    <div class="section-head">
+      <span class="section-eyebrow">08</span>
+      <h2>策略選股</h2>
+    </div>
+
+    <div class="demo-banner" style="margin-bottom:1.5rem;">
+      <b>策略邏輯</b>：全市場掃描（排除ETF）。<b>進場</b>：股價站上5日均線，且當日成交量大於前5日均量。<b>出場</b>：進場後最多持有3個交易日，若期間跌破「進場當天的5日均線」提前停損，撐滿3天則不論盈虧出場。<br>
+      <b>資料限制</b>：這是每天累積一次的市場快照（證交所沒有全市場多日歷史 API），需要累積滿 <b>5個交易日</b> 資料才會開始篩選，累積前只會顯示目前進度。
+    </div>
+
+    <button id="strategyRefreshBtn" class="primary" style="background:var(--accent);color:#1A1500;border:none;border-radius:6px;padding:8px 16px;font-weight:700;font-size:13px;cursor:pointer;margin-bottom:12px;">重新查詢狀態</button>
+
+    <div class="proxy-status" id="strategyStatus"></div>
+
+    <div id="strategyProgressPanel" style="margin-bottom:20px;"></div>
+
+    <div style="margin:0 0 10px;font-size:13px;font-weight:700;color:var(--accent);">目前持有中（進場後尚未出場）</div>
+    <div class="table-wrap" style="margin-bottom:20px;">
+      <table>
+        <thead>
+          <tr>
+            <th>股票</th>
+            <th>進場日</th>
+            <th class="num">進場價</th>
+            <th class="num">進場均線</th>
+            <th class="num">持有天數</th>
+          </tr>
+        </thead>
+        <tbody id="strategyOpenBody"><tr><td colspan="5"><div class="empty-state">尚無資料。</div></td></tr></tbody>
+      </table>
+    </div>
+
+    <div style="margin:0 0 10px;font-size:13px;font-weight:700;color:var(--accent);">近期出場紀錄</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>股票</th>
+            <th>進場日</th>
+            <th class="num">進場價</th>
+            <th>出場日</th>
+            <th class="num">出場價</th>
+            <th class="num">損益%</th>
+            <th>出場原因</th>
+          </tr>
+        </thead>
+        <tbody id="strategyClosedBody"><tr><td colspan="7"><div class="empty-state">尚無資料。</div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+const priceMap = {
+  '2330':{ name:'台積電', price:1075 },
+  '2454':{ name:'聯發科', price:1420 },
+  '2317':{ name:'鴻海', price:203.5 },
+  '3037':{ name:'欣興', price:168 },
+  '2603':{ name:'長榮', price:198.5 },
+  '006208':{ name:'富邦台50', price:112.3 },
+  '0050':{ name:'元大台灣50', price:198.2 },
+  '2882':{ name:'國泰金', price:68.4 },
+  '2891':{ name:'中信金', price:42.1 },
+  '2412':{ name:'中華電', price:126.5 }
+};
+
+const mockIndices = [
+  { key:'TAIEX', name:'加權指數 TAIEX', value:23568.42, change:186.3, changePct:0.79, spark:[20,40,35,55,50,70,90] },
+  { key:'OTC', name:'櫃買指數 OTC', value:271.4, change:-1.2, changePct:-0.44, spark:[60,55,58,50,45,42,38] },
+  { key:'TXF_DAY', name:'台指期(日盤)', value:23610, change:210, changePct:0.90 },
+  { key:'TXF_NIGHT', name:'台指期(夜盤)', value:23540, change:-70, changePct:-0.30 },
+  { key:'DOW', name:'道瓊工業指數', value:44120.5, change:-85.2, changePct:-0.19 },
+  { key:'NASDAQ', name:'那斯達克指數', value:19850.3, change:120.6, changePct:0.61 },
+  { key:'SP500', name:'S&P 500', value:6210.8, change:-12.4, changePct:-0.20 },
+  { key:'SOX', name:'費城半導體 SOX', value:5890.1, change:62.4, changePct:1.06, spark:[30,35,50,45,60,75,85] },
+  { key:'USDTWD', name:'美元/台幣', value:32.15, change:-0.08, changePct:-0.25, spark:[70,68,65,66,60,58,55] }
+];
+
+const mockTrending = [
+  { code:'2330', name:'台積電', price:1075, changePct:1.4, vol:'42,318', type:'股票' },
+  { code:'2454', name:'聯發科', price:1420, changePct:-0.8, vol:'8,120', type:'股票' },
+  { code:'2317', name:'鴻海', price:203.5, changePct:2.1, vol:'55,902', type:'股票' },
+  { code:'3037', name:'欣興', price:168, changePct:3.6, vol:'31,205', type:'股票' },
+  { code:'2603', name:'長榮', price:198.5, changePct:-1.9, vol:'22,410', type:'股票' },
+  { code:'006208', name:'富邦台50', price:112.3, changePct:0.6, vol:'6,850', type:'ETF' },
+  { code:'0050', name:'元大台灣50', price:198.2, changePct:0.5, vol:'9,240', type:'ETF' },
+  { code:'00878', name:'國泰永續高股息', price:32.4, changePct:-0.3, vol:'18,760', type:'ETF' }
+];
+
+let liveIndices = null;   // null = 尚未抓取成功，改用示範資料
+let liveTrending = null;
+
+function fmt(n, digits){ return Number(n).toLocaleString('zh-Hant-TW', { minimumFractionDigits:digits, maximumFractionDigits:digits }); }
+function pctColor(v){ return v > 0 ? 'up-text' : (v < 0 ? 'down-text' : ''); }
+function arrow(v){ return v > 0 ? '▲' : (v < 0 ? '▼' : '—'); }
+
+function renderTicker(){
+  const track = document.getElementById('tickerTrack');
+  const idxSource = liveIndices || mockIndices;
+  const trendSource = liveTrending || mockTrending;
+  const items = [...idxSource, ...trendSource.slice(0,4).map(t => ({ name:t.name, value:t.price, changePct:t.changePct }))];
+  const html = items.map(i => `
+    <span class="ticker-item">
+      <span class="name">${i.name}</span>
+      <span class="${i.changePct >= 0 ? 'ticker-up' : 'ticker-down'}">${arrow(i.changePct)} ${fmt(i.value, i.value > 1000 ? 0 : 1)} (${i.changePct > 0 ? '+' : ''}${fmt(i.changePct,2)}%)</span>
+    </span>`).join('');
+  track.innerHTML = html + html;
+}
+
+function sparkSvg(points, up){
+  const w = 160, h = 32;
+  const max = Math.max(...points), min = Math.min(...points);
+  const norm = points.map((p,i) => {
+    const x = (i/(points.length-1)) * w;
+    const y = h - ((p - min) / (max - min || 1)) * h;
+    return `${x},${y}`;
+  }).join(' ');
+  const color = up ? 'var(--up)' : 'var(--down)';
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${norm}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
+
+function renderIndices(){
+  const grid = document.getElementById('indexGrid');
+  const isLive = !!liveIndices;
+  const source = liveIndices || mockIndices;
+
+  grid.innerHTML = source.map(i => {
+    const hasSpark = Array.isArray(i.spark);
+    const sourceTag = `<span class="tag" style="margin-left:6px;">${isLive ? '即時' : '示範'}</span>`;
+    return `
+    <div class="index-card">
+      <div class="name">${i.name}${sourceTag}</div>
+      <div class="value-row">
+        <span class="value">${i.value != null ? fmt(i.value, i.value > 1000 ? 0 : 2) : '—'}</span>
+        <span class="delta ${pctColor(i.change)}">${i.change != null ? arrow(i.change) + ' ' + fmt(Math.abs(i.change),2) + ' (' + (i.changePct > 0 ? '+' : '') + fmt(i.changePct,2) + '%)' : '無資料'}</span>
+      </div>
+      ${hasSpark ? sparkSvg(i.spark, i.change >= 0) : ''}
+    </div>`;
+  }).join('');
+}
+
+let trendingFilter = 'all';
+let liveGainers = null;
+let liveLosers = null;
+let liveInstBuyers = null;
+let liveInstSellers = null;
+
+function renderTrending(){
+  const body = document.getElementById('trendingBody');
+
+  if(trendingFilter === 'gainers' || trendingFilter === 'losers'){
+    const source = trendingFilter === 'gainers' ? liveGainers : liveLosers;
+
+    if(!source){
+      body.innerHTML = `<tr><td colspan="5"><div class="empty-state">尚未取得排行資料，請先貼上網址並重新整理。</div></td></tr>`;
+      return;
+    }
+    if(source.length === 0){
+      body.innerHTML = `<tr><td colspan="5"><div class="empty-state">今天沒有符合條件的資料。</div></td></tr>`;
+      return;
+    }
+
+    body.innerHTML = source.map(t => `
+      <tr class="clickable-row" data-code="${t.code}">
+        <td><div>${t.name}</div><div class="code">${t.code}</div></td>
+        <td class="num">${fmt(t.price, t.price > 1000 ? 0 : 1)}</td>
+        <td class="num ${pctColor(t.changePct)}">${arrow(t.changePct)} ${t.changePct > 0 ? '+' : ''}${fmt(t.changePct,2)}%</td>
+        <td class="num">${t.vol}</td>
+        <td><span class="tag">股票</span> <span class="tag">即時（盤後）</span></td>
+      </tr>`).join('');
+    return;
+  }
+
+  if(trendingFilter === 'inst_buy' || trendingFilter === 'inst_sell'){
+    const source = trendingFilter === 'inst_buy' ? liveInstBuyers : liveInstSellers;
+
+    if(!source){
+      body.innerHTML = `<tr><td colspan="5"><div class="empty-state">尚未取得法人買賣超排行，請先貼上網址並重新整理。</div></td></tr>`;
+      return;
+    }
+    if(source.length === 0){
+      body.innerHTML = `<tr><td colspan="5"><div class="empty-state">今天沒有符合條件的資料。</div></td></tr>`;
+      return;
+    }
+
+    body.innerHTML = source.map(t => {
+      const lots = (t.net / 1000).toLocaleString('zh-Hant-TW', { maximumFractionDigits: 0 });
+      const priceCell = t.price !== null && t.price !== undefined ? fmt(t.price, t.price > 1000 ? 0 : 1) : '—';
+      const changeCell = (t.changePct !== null && t.changePct !== undefined)
+        ? `<span class="${pctColor(t.changePct)}">${arrow(t.changePct)} ${t.changePct > 0 ? '+' : ''}${fmt(t.changePct,2)}%</span>`
+        : '—';
+      return `
+      <tr class="clickable-row" data-code="${t.code}">
+        <td><div>${t.name}</div><div class="code">${t.code}</div></td>
+        <td class="num">${priceCell}</td>
+        <td class="num">${changeCell}</td>
+        <td class="num ${t.net >= 0 ? 'up-text' : 'down-text'}">${t.net > 0 ? '+' : ''}${lots}張</td>
+        <td><span class="tag">股票</span> <span class="tag">即時（盤後）</span></td>
+      </tr>`;
+    }).join('');
+    return;
+  }
+
+  const isLive = !!liveTrending;
+  const source = liveTrending || mockTrending;
+  const filtered = trendingFilter === 'all' ? source : source.filter(t => t.type === trendingFilter);
+  const sourceTag = isLive ? '即時（盤後）' : '示範';
+
+  if(filtered.length === 0){
+    body.innerHTML = `<tr><td colspan="5"><div class="empty-state">這個分類目前沒有資料。</div></td></tr>`;
+    return;
+  }
+
+  body.innerHTML = filtered.map(t => `
+    <tr class="clickable-row" data-code="${t.code}">
+      <td><div>${t.name}</div><div class="code">${t.code}</div></td>
+      <td class="num">${fmt(t.price, t.price > 1000 ? 0 : 1)}</td>
+      <td class="num ${pctColor(t.changePct)}">${arrow(t.changePct)} ${t.changePct > 0 ? '+' : ''}${fmt(t.changePct,2)}%</td>
+      <td class="num">${t.vol}</td>
+      <td><span class="tag">${t.type}</span> <span class="tag">${sourceTag}</span></td>
+    </tr>`).join('');
+}
+
+document.getElementById('trendingTabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('.tab-btn');
+  if(!btn) return;
+  trendingFilter = btn.dataset.filter;
+  document.querySelectorAll('#trendingTabs .tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+  renderTrending();
+});
+
+document.getElementById('trendingBody').addEventListener('click', (e) => {
+  const row = e.target.closest('.clickable-row');
+  if(!row) return;
+  jumpToKline(row.dataset.code);
+});
+
+function switchTab(targetId){
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.target === targetId));
+  document.querySelectorAll('.page-section').forEach(s => s.classList.toggle('active', s.id === targetId));
+  document.querySelector('.content-area').scrollTop = 0;
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+document.getElementById('sidebarNav').addEventListener('click', (e) => {
+  const btn = e.target.closest('.nav-item');
+  if(!btn) return;
+  switchTab(btn.dataset.target);
+  if(btn.dataset.target === 'strategySection' && proxyUrl){
+    fetchStrategyStatus();
+  }
+});
+
+function jumpToKline(code){
+  document.getElementById('klineCodeInput').value = code;
+  klineCurrentCode = code;
+  fetchKline(code);
+  switchTab('klineSection');
+}
+
+document.getElementById('jumpToInstBtn').addEventListener('click', () => {
+  if(!klineCurrentCode){
+    alert('請先查詢一支股票的K線。');
+    return;
+  }
+  fetchInstitutional(klineCurrentCode);
+  switchTab('institutionalSection');
+});
+
+// ---------- 帳號系統 ----------
+async function hashPassword(username, password){
+  const enc = new TextEncoder();
+  const data = enc.encode(username.toLowerCase() + ':' + password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+let authMode = 'login';
+let currentUsername = null;
+let currentPasswordHash = null;
+
+document.getElementById('authTabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('.tab-btn');
+  if(!btn) return;
+  authMode = btn.dataset.mode;
+  document.querySelectorAll('#authTabs .tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+  document.getElementById('authSubmitBtn').textContent = authMode === 'login' ? '登入' : '註冊';
+  setAuthStatus('', '');
+});
+
+function setAuthStatus(text, kind){
+  const el = document.getElementById('authStatus');
+  el.textContent = text;
+  el.className = 'proxy-status' + (kind ? ' ' + kind : '');
+}
+
+document.getElementById('authSubmitBtn').addEventListener('click', async () => {
+  if(!proxyUrl){
+    setAuthStatus('請先在下方貼上並儲存 GAS proxy 網址，才能登入/註冊。', 'error');
+    return;
+  }
+
+  const username = document.getElementById('authUsername').value.trim();
+  const password = document.getElementById('authPassword').value;
+  if(!username || !password){
+    setAuthStatus('請輸入帳號與密碼。', 'error');
+    return;
+  }
+
+  setAuthStatus('處理中...', '');
+  const passwordHash = await hashPassword(username, password);
+
+  try{
+    if(authMode === 'register'){
+      const url = proxyUrl + '?type=register&username=' + encodeURIComponent(username) + '&passwordHash=' + passwordHash;
+      const result = await fetchViaJsonp(url, 20000);
+      if(!result.ok){
+        setAuthStatus('註冊失敗：' + result.error, 'error');
+        return;
+      }
+      setAuthStatus('註冊成功！請按「登入」頁籤登入。', 'ok');
+      authMode = 'login';
+      document.querySelectorAll('#authTabs .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === 'login'));
+      document.getElementById('authSubmitBtn').textContent = '登入';
+      return;
+    }
+
+    const url = proxyUrl + '?type=login&username=' + encodeURIComponent(username) + '&passwordHash=' + passwordHash;
+    const result = await fetchViaJsonp(url, 20000);
+    if(!result.ok){
+      setAuthStatus('登入失敗：' + result.error, 'error');
+      return;
+    }
+
+    currentUsername = username;
+    currentPasswordHash = passwordHash;
+    await loadUserDataFromServer();
+    showLoggedInUI();
+    checkWatchedMaAlerts();
+  }catch(err){
+    setAuthStatus('連線失敗：' + err.message, 'error');
+  }
+});
+
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  currentUsername = null;
+  currentPasswordHash = null;
+  holdings = [];
+  watchlist = [];
+  klineAlertState = {};
+  renderHoldings();
+  renderWatchlist();
+  showLoggedOutUI();
+});
+
+function showLoggedInUI(){
+  document.getElementById('authPanel').style.display = 'none';
+  document.getElementById('loggedInPanel').style.display = 'block';
+  document.getElementById('loggedInUsername').textContent = currentUsername;
+  document.getElementById('holdingsGate').style.display = 'none';
+  document.getElementById('holdingsContent').style.display = 'block';
+  document.getElementById('watchlistGate').style.display = 'none';
+  document.getElementById('watchlistContent').style.display = 'block';
+}
+
+function showLoggedOutUI(){
+  document.getElementById('authPanel').style.display = 'block';
+  document.getElementById('loggedInPanel').style.display = 'none';
+  document.getElementById('holdingsGate').style.display = 'block';
+  document.getElementById('holdingsContent').style.display = 'none';
+  document.getElementById('watchlistGate').style.display = 'block';
+  document.getElementById('watchlistContent').style.display = 'none';
+}
+
+async function loadUserDataFromServer(){
+  if(!currentUsername || !proxyUrl) return;
+  try{
+    const url = proxyUrl + '?type=getUserData&username=' + encodeURIComponent(currentUsername) + '&passwordHash=' + currentPasswordHash;
+    const result = await fetchViaJsonp(url, 20000);
+    if(result.ok){
+      holdings = result.holdings || [];
+      watchlist = result.watchlist || [];
+      klineAlertState = result.maAlerts || {};
+      renderHoldings();
+      renderWatchlist();
+    }else{
+      setAuthStatus('讀取資料失敗：' + result.error, 'error');
+    }
+  }catch(err){
+    console.error('讀取使用者資料失敗', err);
+  }
+}
+
+let holdings = [];
+let watchlist = []; // 陣列，每個元素是股票代號字串
+
+async function saveWatchlist(){
+  if(!currentUsername || !proxyUrl) return;
+  try{
+    const url = proxyUrl + '?type=saveUserData&username=' + encodeURIComponent(currentUsername) + '&passwordHash=' + currentPasswordHash + '&field=watchlist&data=' + encodeURIComponent(JSON.stringify(watchlist));
+    await fetchViaJsonp(url, 20000);
+  }catch(e){
+    console.error('儲存關注股票失敗', e);
+  }
+}
+
+function renderWatchlist(){
+  const body = document.getElementById('watchlistBody');
+
+  if(watchlist.length === 0){
+    body.innerHTML = `<tr><td colspan="4"><div class="empty-state">尚未加入任何關注股票，從下方新增代號。</div></td></tr>`;
+    return;
+  }
+
+  body.innerHTML = watchlist.map((code, idx) => {
+    const info = priceMap[code];
+    const live = livePrices[code];
+    const name = (info && info.name) || (live && live.name) || code;
+    const price = currentPriceFor(code);
+    const hasPrice = price !== null;
+    const isLive = live && !live.error && live.price !== null && live.price !== undefined;
+    const prevClose = (live && live.prevClose) || null;
+    const changePct = (hasPrice && prevClose) ? (price - prevClose) / prevClose * 100 : null;
+
+    let priceCell;
+    if(hasPrice){
+      const sourceTag = isLive ? '<span class="tag" style="margin-left:6px;">即時</span>' : '<span class="tag" style="margin-left:6px;">示範</span>';
+      priceCell = fmt(price, price > 1000 ? 0 : 1) + sourceTag;
+    }else{
+      priceCell = '（查無資料）';
+    }
+
+    const changeCell = changePct !== null
+      ? `<span class="${pctColor(changePct)}">${arrow(changePct)} ${changePct > 0 ? '+' : ''}${fmt(changePct,2)}%</span>`
+      : '—';
+
+    return `
+      <tr>
+        <td><div>${name}</div><div class="code">${code}</div></td>
+        <td class="num">${priceCell}</td>
+        <td class="num">${changeCell}</td>
+        <td><button class="del-btn" data-idx="${idx}">刪除</button></td>
+      </tr>`;
+  }).join('');
+
+  body.querySelectorAll('.del-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const i = parseInt(btn.dataset.idx, 10);
+      const code = watchlist[i];
+      const info = priceMap[code];
+      const name = (info && info.name) || code;
+      const confirmed = confirm(`確定要從關注股票移除「${name}（${code}）」嗎？`);
+      if(!confirmed) return;
+      watchlist.splice(i, 1);
+      await saveWatchlist();
+      renderWatchlist();
+    });
+  });
+}
+
+document.getElementById('watchAddBtn').addEventListener('click', async () => {
+  const input = document.getElementById('watchInputCode');
+  const code = input.value.trim();
+  if(!code) return;
+  if(watchlist.includes(code)){
+    alert('這支股票已經在關注清單裡了。');
+    return;
+  }
+  watchlist.push(code);
+  await saveWatchlist();
+  renderWatchlist();
+  input.value = '';
+  input.focus();
+
+  if(proxyUrl){
+    refreshAllData();
+  }
+});
+let livePrices = {};
+let proxyUrl = '';
+
+async function saveHoldings(){
+  if(!currentUsername || !proxyUrl) return;
+  try{
+    const url = proxyUrl + '?type=saveUserData&username=' + encodeURIComponent(currentUsername) + '&passwordHash=' + currentPasswordHash + '&field=holdings&data=' + encodeURIComponent(JSON.stringify(holdings));
+    await fetchViaJsonp(url, 20000);
+  }catch(e){
+    console.error('儲存失敗', e);
+  }
+}
+
+async function loadProxyUrl(){
+  try{
+    proxyUrl = localStorage.getItem('tw-dashboard:proxy-url') || '';
+  }catch(e){
+    proxyUrl = '';
+  }
+  document.getElementById('proxyUrlInput').value = proxyUrl;
+}
+
+async function saveProxyUrl(url){
+  proxyUrl = url;
+  try{
+    localStorage.setItem('tw-dashboard:proxy-url', url);
+  }catch(e){
+    console.error('儲存網址失敗', e);
+  }
+}
+
+function setProxyStatus(text, kind){
+  const el = document.getElementById('proxyStatus');
+  el.textContent = text;
+  el.className = 'proxy-status' + (kind ? ' ' + kind : '');
+}
+
+function fetchViaJsonp(url, timeoutMs = 8000){
+  return new Promise((resolve, reject) => {
+    const callbackName = 'twDashboardCb_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+    const script = document.createElement('script');
+    let settled = false;
+
+    const cleanup = () => {
+      delete window[callbackName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      clearTimeout(timer);
+    };
+
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error('請求逾時，請確認網址是否正確'));
+    }, timeoutMs);
+
+    window[callbackName] = (data) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(data);
+    };
+
+    script.onerror = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error('無法載入，請確認網址是否正確、部署是否已開放給任何人'));
+    };
+
+    const sep = url.includes('?') ? '&' : '?';
+    script.src = url + sep + 'callback=' + callbackName;
+    document.body.appendChild(script);
+  });
+}
+
+async function refreshAllData(){
+  if(!proxyUrl){
+    setProxyStatus('請先貼上並儲存 GAS proxy 網址。', 'error');
+    return;
+  }
+
+  const codes = [...new Set([...holdings.map(h => h.code), ...watchlist])];
+  setProxyStatus('抓取中...', '');
+
+  try{
+    const requestUrl = proxyUrl + '?type=dashboard&codes=' + encodeURIComponent(codes.join(','));
+    const data = await fetchViaJsonp(requestUrl);
+
+    if(data.quotes){
+      livePrices = data.quotes;
+    }
+
+    if(data.indices){
+      const mapped = [];
+      if(data.indices.TAIEX) mapped.push({ ...data.indices.TAIEX, key:'TAIEX' });
+      if(data.indices.OTC) mapped.push({ ...data.indices.OTC, key:'OTC' });
+      if(data.indices.SOX) mapped.push({ ...data.indices.SOX, key:'SOX' });
+      if(data.indices.USDTWD) mapped.push({ ...data.indices.USDTWD, key:'USDTWD' });
+      if(data.indices.DOW) mapped.push({ ...data.indices.DOW, key:'DOW' });
+      if(data.indices.NASDAQ) mapped.push({ ...data.indices.NASDAQ, key:'NASDAQ' });
+      if(data.indices.SP500) mapped.push({ ...data.indices.SP500, key:'SP500' });
+      if(data.indices.TXF_DAY) mapped.push({ ...data.indices.TXF_DAY, key:'TXF_DAY' });
+      if(data.indices.TXF_NIGHT) mapped.push({ ...data.indices.TXF_NIGHT, key:'TXF_NIGHT' });
+      if(mapped.length > 0) liveIndices = mapped;
+
+      if(data.indices.TAIEX_ERROR){
+        console.warn('大盤指數（加權/櫃買）抓取失敗：', data.indices.TAIEX_ERROR);
+      }
+    }
+
+    if(data.trending && Array.isArray(data.trending.list) && data.trending.list.length > 0){
+      liveTrending = data.trending.list.map(item => ({
+        code: item.code,
+        name: item.name,
+        price: item.price,
+        changePct: item.changePct,
+        vol: item.volume ? Number(item.volume).toLocaleString('zh-Hant-TW') : '—',
+        type: item.type
+      }));
+    }
+
+    if(data.movers && !data.movers.error){
+      const mapMover = item => ({
+        code: item.code,
+        name: item.name,
+        price: item.price,
+        changePct: item.changePct,
+        vol: item.volume ? Number(item.volume).toLocaleString('zh-Hant-TW') : '—'
+      });
+      if(Array.isArray(data.movers.gainers)) liveGainers = data.movers.gainers.map(mapMover);
+      if(Array.isArray(data.movers.losers)) liveLosers = data.movers.losers.map(mapMover);
+    }
+
+    if(data.institutionalRanking && !data.institutionalRanking.error){
+      const mapRanking = item => ({
+        code: item.code,
+        name: item.name,
+        net: item.net,
+        price: item.price,
+        changePct: item.changePct
+      });
+      if(Array.isArray(data.institutionalRanking.buyers)) liveInstBuyers = data.institutionalRanking.buyers.map(mapRanking);
+      if(Array.isArray(data.institutionalRanking.sellers)) liveInstSellers = data.institutionalRanking.sellers.map(mapRanking);
+    }
+
+    const now = new Date();
+    let statusMsg = '更新於 ' + now.toLocaleTimeString('zh-Hant-TW', { hour12:false });
+    if(data.indices && data.indices.TAIEX_ERROR){
+      statusMsg += '（大盤指數部分抓取失敗：' + data.indices.TAIEX_ERROR + '）';
+    }
+    setProxyStatus(statusMsg, data.indices && data.indices.TAIEX_ERROR ? 'error' : 'ok');
+
+    renderHoldings();
+    renderWatchlist();
+    renderTicker();
+    renderIndices();
+    renderTrending();
+  }catch(err){
+    setProxyStatus('抓取失敗：' + err.message + '（可能是網址錯誤、部署權限未開放給任何人，或 GAS 尚未部署）', 'error');
+  }
+}
+
+function currentPriceFor(code){
+  const live = livePrices[code];
+  if(live && !live.error && live.price !== null && live.price !== undefined){
+    return live.price;
+  }
+  return priceMap[code] ? priceMap[code].price : null;
+}
+
+function renderHoldings(){
+  const body = document.getElementById('holdingsBody');
+  const totalsRow = document.getElementById('totalsRow');
+
+  if(holdings.length === 0){
+    body.innerHTML = `<tr><td colspan="7"><div class="empty-state">尚未新增持股，從下方新增你的第一筆持股。</div></td></tr>`;
+    totalsRow.innerHTML = '';
+    return;
+  }
+
+  let totalCost = 0, totalValue = 0;
+
+  body.innerHTML = holdings.map((h, idx) => {
+    const info = priceMap[h.code];
+    const live = livePrices[h.code];
+    const name = (info && info.name) || (live && live.name) || h.code;
+    const price = currentPriceFor(h.code);
+    const hasPrice = price !== null;
+    const isLive = live && !live.error && live.price !== null && live.price !== undefined;
+    const marketValue = hasPrice ? price * h.shares : h.cost * h.shares;
+    const costValue = h.cost * h.shares;
+    const pnl = marketValue - costValue;
+    const pnlPct = costValue > 0 ? (pnl / costValue) * 100 : 0;
+
+    totalCost += costValue;
+    totalValue += marketValue;
+
+    let priceCell;
+    if(hasPrice){
+      const sourceTag = isLive ? '<span class="tag" style="margin-left:6px;">即時</span>' : '<span class="tag" style="margin-left:6px;">示範</span>';
+      priceCell = fmt(price, price > 1000 ? 0 : 1) + sourceTag;
+    }else{
+      priceCell = '（查無資料）';
+    }
+
+    return `
+      <tr>
+        <td><div>${name}</div><div class="code">${h.code}</div></td>
+        <td class="num">${fmt(h.shares,0)}</td>
+        <td class="num">${fmt(h.cost,2)}</td>
+        <td class="num">${priceCell}</td>
+        <td class="num ${pctColor(pnl)}">${pnl > 0 ? '+' : ''}${fmt(pnl,0)}</td>
+        <td class="num ${pctColor(pnlPct)}">${pnlPct > 0 ? '+' : ''}${fmt(pnlPct,2)}%</td>
+        <td><button class="del-btn" data-idx="${idx}">刪除</button></td>
+      </tr>`;
+  }).join('');
+
+  const totalPnl = totalValue - totalCost;
+  const totalPnlPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0;
+
+  totalsRow.innerHTML = `
+    <div class="total-card">
+      <div class="label">總市值</div>
+      <div class="value">${fmt(totalValue,0)}</div>
+    </div>
+    <div class="total-card">
+      <div class="label">總成本</div>
+      <div class="value">${fmt(totalCost,0)}</div>
+    </div>
+    <div class="total-card">
+      <div class="label">未實現損益</div>
+      <div class="value ${pctColor(totalPnl)}">${totalPnl > 0 ? '+' : ''}${fmt(totalPnl,0)}</div>
+    </div>
+    <div class="total-card">
+      <div class="label">總報酬率</div>
+      <div class="value ${pctColor(totalPnlPct)}">${totalPnlPct > 0 ? '+' : ''}${fmt(totalPnlPct,2)}%</div>
+    </div>`;
+
+  body.querySelectorAll('.del-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const i = parseInt(btn.dataset.idx, 10);
+      const target = holdings[i];
+      const targetName = priceMap[target.code] ? priceMap[target.code].name : target.code;
+      const confirmed = confirm(`確定要刪除「${targetName}（${target.code}）」這筆持股嗎？`);
+      if(!confirmed) return;
+      holdings.splice(i, 1);
+      await saveHoldings();
+      renderHoldings();
+    });
+  });
+}
+
+document.getElementById('addBtn').addEventListener('click', async () => {
+  const codeInput = document.getElementById('inputCode');
+  const sharesInput = document.getElementById('inputShares');
+  const costInput = document.getElementById('inputCost');
+
+  const code = codeInput.value.trim();
+  const shares = parseFloat(sharesInput.value);
+  const cost = parseFloat(costInput.value);
+
+  if(!code || !shares || !cost || shares <= 0 || cost < 0) return;
+
+  holdings.push({ code, shares, cost });
+  await saveHoldings();
+  renderHoldings();
+
+  codeInput.value = '';
+  sharesInput.value = '';
+  costInput.value = '';
+  codeInput.focus();
+});
+
+document.getElementById('saveProxyBtn').addEventListener('click', async () => {
+  const url = document.getElementById('proxyUrlInput').value.trim();
+  await saveProxyUrl(url);
+  setProxyStatus(url ? '網址已儲存。' : '已清空網址。', '');
+  if(url){
+    await refreshAllData();
+  }
+});
+
+document.getElementById('refreshPricesBtn').addEventListener('click', refreshAllData);
+
+let autoRefreshTimer = null;
+document.getElementById('autoRefreshToggle').addEventListener('change', (e) => {
+  if(e.target.checked){
+    if(!proxyUrl){
+      setProxyStatus('請先貼上並儲存 GAS proxy 網址，才能開啟自動更新。', 'error');
+      e.target.checked = false;
+      return;
+    }
+    autoRefreshTimer = setInterval(refreshAllData, 60000);
+  }else{
+    if(autoRefreshTimer) clearInterval(autoRefreshTimer);
+    autoRefreshTimer = null;
+  }
+});
+
+// ---------- K線圖 ----------
+let klineData = null;
+let klinePeriodMonths = 6;
+let klineMaSet = new Set([5, 10]);
+let klineCurrentCode = null;
+let klinePeriodType = 'day'; // 'day' | 'week' | 'month'
+const klineMaColors = { 5:'#5EC8D8', 10:'#C9A227', 30:'#B57EDC', 60:'#E8965A' };
+
+function setKlineStatus(text, kind){
+  const el = document.getElementById('klineStatus');
+  el.textContent = text;
+  el.className = 'proxy-status' + (kind ? ' ' + kind : '');
+}
+
+document.getElementById('klinePeriodTabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('.tab-btn');
+  if(!btn) return;
+  klinePeriodMonths = parseInt(btn.dataset.months, 10);
+  document.querySelectorAll('#klinePeriodTabs .tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+  if(klineCurrentCode) fetchKline(klineCurrentCode);
+});
+
+document.getElementById('klineTypeTabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('.tab-btn');
+  if(!btn) return;
+  klinePeriodType = btn.dataset.type;
+  document.querySelectorAll('#klineTypeTabs .tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+  renderKlineChart();
+  renderMaPanel();
+});
+
+// 把日K資料依週/月分組，開高低收成交量重新彙總
+function aggregateKline(data, type){
+  if(type === 'day') return data;
+
+  const groups = {};
+  const keyFor = (dateStr) => {
+    if(type === 'month') return dateStr.slice(0, 7); // YYYY-MM
+    const dt = new Date(dateStr);
+    const day = dt.getDay(); // 0=Sun
+    const diffToMonday = (day === 0 ? -6 : 1 - day);
+    const monday = new Date(dt);
+    monday.setDate(dt.getDate() + diffToMonday);
+    return monday.toISOString().slice(0, 10); // 該週週一的日期
+  };
+
+  data.forEach(d => {
+    const key = keyFor(d.date);
+    if(!groups[key]) groups[key] = [];
+    groups[key].push(d);
+  });
+
+  return Object.keys(groups).sort().map(key => {
+    const arr = groups[key];
+    return {
+      date: type === 'month' ? key + '-01' : key,
+      open: arr[0].open,
+      high: Math.max(...arr.map(x => x.high)),
+      low: Math.min(...arr.map(x => x.low)),
+      close: arr[arr.length - 1].close,
+      volume: arr.reduce((s, x) => s + x.volume, 0)
+    };
+  });
+}
+
+function klineDateLabel(d){
+  return klinePeriodType === 'month' ? d.date.slice(0, 7) : d.date.slice(5);
+}
+
+// ---------- 均線穿越頁面提醒（帳號綁定，開啟頁面時檢查一次） ----------
+let klineAlertState = {}; // { [code]: { [period]: { active: bool, lastState: 'above'|'below'|null } } }
+
+async function saveAlertState(){
+  if(!currentUsername || !proxyUrl) return;
+  try{
+    const url = proxyUrl + '?type=saveUserData&username=' + encodeURIComponent(currentUsername) + '&passwordHash=' + currentPasswordHash + '&field=maAlerts&data=' + encodeURIComponent(JSON.stringify(klineAlertState));
+    await fetchViaJsonp(url, 20000);
+  }catch(e){
+    console.error('儲存提醒狀態失敗', e);
+  }
+}
+
+function isAlertActive(code, period){
+  return !!(klineAlertState[code] && klineAlertState[code][period] && klineAlertState[code][period].active);
+}
+
+async function toggleMaAlert(code, period){
+  if(!currentUsername){
+    alert('請先到「個人存股表現」登入帳號，才能設定均線提醒。');
+    return;
+  }
+
+  if(!klineAlertState[code]) klineAlertState[code] = {};
+  const currentlyActive = isAlertActive(code, period);
+
+  if(!currentlyActive){
+    // 開啟提醒：用目前畫面上的資料算出「現在」的狀態，當作基準，避免一開就誤判成剛穿越
+    const data = aggregateKline(klineData, klinePeriodType);
+    const ma = calcMA(data, period);
+    const lastMA = ma[ma.length - 1];
+    const lastClose = data[data.length - 1].close;
+    const initialState = (lastMA !== null) ? (lastClose >= lastMA ? 'above' : 'below') : null;
+    klineAlertState[code][period] = { active: true, lastState: initialState };
+  }else{
+    const prev = klineAlertState[code][period];
+    klineAlertState[code][period] = { active: false, lastState: prev ? prev.lastState : null };
+  }
+
+  await saveAlertState();
+  renderMaPanel();
+}
+
+function monthsForPeriod(period){
+  return period <= 10 ? 2 : (period <= 30 ? 3 : 4);
+}
+
+// 開啟頁面時，把所有已設定「站上提醒」的股票都檢查一次
+async function checkWatchedMaAlerts(){
+  if(!proxyUrl || !currentUsername) return;
+
+  const messages = [];
+
+  for(const code of Object.keys(klineAlertState)){
+    const activePeriods = Object.keys(klineAlertState[code]).filter(p => klineAlertState[code][p] && klineAlertState[code][p].active);
+    if(activePeriods.length === 0) continue;
+
+    const maxMonths = Math.max(...activePeriods.map(p => monthsForPeriod(parseInt(p, 10))));
+
+    try{
+      const url = proxyUrl + '?type=kline&code=' + encodeURIComponent(code) + '&months=' + maxMonths;
+      const result = await fetchViaJsonp(url, 20000);
+      if(result.error || !result.data || result.data.length === 0) continue;
+
+      const lastClose = result.data[result.data.length - 1].close;
+
+      activePeriods.forEach(pStr => {
+        const period = parseInt(pStr, 10);
+        const ma = calcMA(result.data, period);
+        const lastMA = ma[ma.length - 1];
+        if(lastMA === null) return;
+
+        const currentState = lastClose >= lastMA ? 'above' : 'below';
+        const prevState = klineAlertState[code][pStr].lastState;
+
+        if(prevState && prevState !== currentState && currentState === 'above'){
+          messages.push(`${result.code || code}（${code}）剛站上 ${period}日均線（${lastMA.toFixed(2)}），目前 ${lastClose.toFixed(2)}`);
+        }
+        klineAlertState[code][pStr].lastState = currentState;
+      });
+    }catch(err){
+      console.error('檢查 ' + code + ' 的均線提醒失敗', err);
+    }
+  }
+
+  await saveAlertState();
+
+  if(messages.length > 0){
+    showGlobalAlertBanner(messages);
+  }
+}
+
+function showGlobalAlertBanner(messages){
+  const container = document.getElementById('globalAlertBanner');
+  container.innerHTML = messages.map(m => `<div class="global-alert-item">🔔 ${m}</div>`).join('') +
+    `<button id="dismissAlertBanner">關閉</button>`;
+  container.style.display = 'block';
+  document.getElementById('dismissAlertBanner').addEventListener('click', () => {
+    container.style.display = 'none';
+  });
+}
+
+function renderMaPanel(){
+  const panel = document.getElementById('klineMaPanel');
+  if(!panel) return;
+
+  if(!klineData || klineData.length === 0 || !klineCurrentCode){
+    panel.innerHTML = '';
+    return;
+  }
+
+  const data = aggregateKline(klineData, klinePeriodType);
+  const lastClose = data[data.length - 1].close;
+  const code = klineCurrentCode;
+  const periods = [5, 10, 30, 60];
+
+  const rows = periods.map(p => {
+    const ma = calcMA(data, p);
+    const lastMA = ma[ma.length - 1];
+
+    if(lastMA === null){
+      return `<div class="ma-card">
+        <span class="ma-label" style="color:${klineMaColors[p]};">MA${p}</span>
+        <span class="ma-value" style="color:#5B6072;font-size:13px;">資料不足</span>
+      </div>`;
+    }
+
+    const above = lastClose >= lastMA;
+    const active = isAlertActive(code, p);
+    const diffPct = ((lastClose - lastMA) / lastMA) * 100;
+
+    return `<div class="ma-card">
+      <span class="ma-label" style="color:${klineMaColors[p]};">MA${p}</span>
+      <span class="ma-value">${lastMA.toFixed(2)}</span>
+      <span class="ma-status" style="color:${above ? 'var(--up)' : 'var(--down)'};">${above ? '站上' : '跌破'} ${diffPct > 0 ? '+' : ''}${diffPct.toFixed(1)}%</span>
+      <button class="ma-alert-btn ${active ? 'active' : ''}" data-code="${code}" data-period="${p}">${active ? '🔔 站上提醒已開' : '設定站上提醒'}</button>
+    </div>`;
+  }).join('');
+
+  panel.innerHTML = `<div class="ma-grid">${rows}</div>`;
+
+  panel.querySelectorAll('.ma-alert-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      toggleMaAlert(btn.dataset.code, parseInt(btn.dataset.period, 10));
+    });
+  });
+}
+
+document.getElementById('klineMaTabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('.tab-btn');
+  if(!btn) return;
+  const ma = parseInt(btn.dataset.ma, 10);
+  btn.classList.toggle('active');
+  if(btn.classList.contains('active')) klineMaSet.add(ma); else klineMaSet.delete(ma);
+  renderKlineChart();
+});
+
+let klineIndicator = 'kd'; // 'none' | 'kd' | 'macd' | 'rsi'
+
+document.getElementById('klineIndicatorTabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('.tab-btn');
+  if(!btn) return;
+  klineIndicator = btn.dataset.indicator;
+  document.querySelectorAll('#klineIndicatorTabs .tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+  renderKlineChart();
+});
+
+// KD：n=9，RSV 權重 1/3，K/D 初始值 50（台股慣用參數）
+function calcKD(data, n){
+  n = n || 9;
+  const kArr = [], dArr = [];
+  let prevK = 50, prevD = 50;
+  for(let i = 0; i < data.length; i++){
+    if(i < n - 1){ kArr.push(null); dArr.push(null); continue; }
+    let highN = -Infinity, lowN = Infinity;
+    for(let j = i - n + 1; j <= i; j++){
+      highN = Math.max(highN, data[j].high);
+      lowN = Math.min(lowN, data[j].low);
+    }
+    const rsv = highN === lowN ? 50 : (data[i].close - lowN) / (highN - lowN) * 100;
+    const k = prevK * 2 / 3 + rsv * 1 / 3;
+    const d = prevD * 2 / 3 + k * 1 / 3;
+    kArr.push(k); dArr.push(d);
+    prevK = k; prevD = d;
+  }
+  return { k: kArr, d: dArr };
+}
+
+function calcEMA(values, period){
+  const result = [];
+  const mult = 2 / (period + 1);
+  let ema = null;
+  for(let i = 0; i < values.length; i++){
+    if(ema === null){ ema = values[i]; } else { ema = (values[i] - ema) * mult + ema; }
+    result.push(ema);
+  }
+  return result;
+}
+
+// MACD：12/26/9 天（標準參數）
+function calcMACD(data){
+  const closes = data.map(d => d.close);
+  const ema12 = calcEMA(closes, 12);
+  const ema26 = calcEMA(closes, 26);
+  const macdLine = closes.map((_, i) => ema12[i] - ema26[i]);
+  const signalLine = calcEMA(macdLine, 9);
+  const histogram = macdLine.map((v, i) => v - signalLine[i]);
+  return { macd: macdLine, signal: signalLine, histogram: histogram };
+}
+
+// RSI：14天（標準參數）
+function calcRSI(data, period){
+  period = period || 14;
+  const closes = data.map(d => d.close);
+  const result = [];
+  let avgGain = 0, avgLoss = 0;
+  for(let i = 0; i < closes.length; i++){
+    if(i === 0){ result.push(null); continue; }
+    const change = closes[i] - closes[i - 1];
+    const gain = change > 0 ? change : 0;
+    const loss = change < 0 ? -change : 0;
+    if(i < period){
+      avgGain += gain; avgLoss += loss;
+      result.push(null);
+    }else if(i === period){
+      avgGain = (avgGain + gain) / period;
+      avgLoss = (avgLoss + loss) / period;
+      const rs = avgLoss === 0 ? Infinity : avgGain / avgLoss;
+      result.push(avgLoss === 0 ? 100 : 100 - 100 / (1 + rs));
+    }else{
+      avgGain = (avgGain * (period - 1) + gain) / period;
+      avgLoss = (avgLoss * (period - 1) + loss) / period;
+      const rs = avgLoss === 0 ? Infinity : avgGain / avgLoss;
+      result.push(avgLoss === 0 ? 100 : 100 - 100 / (1 + rs));
+    }
+  }
+  return result;
+}
+
+document.getElementById('klineBtn').addEventListener('click', () => {
+  const code = document.getElementById('klineCodeInput').value.trim();
+  if(!code) return;
+  klineCurrentCode = code;
+  fetchKline(code);
+});
+
+async function fetchKline(code){
+  if(!proxyUrl){
+    setKlineStatus('請先在「個人存股表現」區塊貼上並儲存 GAS proxy 網址。', 'error');
+    return;
+  }
+
+  setKlineStatus('抓取中...（要抓多個月份，可能需要幾秒）', '');
+
+  try{
+    const url = proxyUrl + '?type=kline&code=' + encodeURIComponent(code) + '&months=' + klinePeriodMonths;
+    const timeoutMs = Math.max(25000, klinePeriodMonths * 1500 + 8000);
+    const data = await fetchViaJsonp(url, timeoutMs);
+
+    if(data.error || !data.data || data.data.length === 0){
+      setKlineStatus('查無資料：' + (data.error || '這個代號可能不是上市股票，或近期沒有交易資料'), 'error');
+      klineData = null;
+      renderKlineChart();
+      renderMaPanel();
+      return;
+    }
+
+    klineData = data.data;
+    setKlineStatus(data.code + '，共 ' + klineData.length + ' 個交易日（資料來源：證交所，僅支援上市股票）', 'ok');
+    renderKlineChart();
+    renderMaPanel();
+  }catch(err){
+    setKlineStatus('抓取失敗：' + err.message, 'error');
+  }
+}
+
+function calcMA(data, period){
+  const result = [];
+  for(let i = 0; i < data.length; i++){
+    if(i < period - 1){ result.push(null); continue; }
+    let sum = 0;
+    for(let j = i - period + 1; j <= i; j++) sum += data[j].close;
+    result.push(sum / period);
+  }
+  return result;
+}
+
+let klineLayout = null;
+
+function renderKlineChart(){
+  const container = document.getElementById('klineChartContainer');
+
+  if(!klineData || klineData.length === 0){
+    container.innerHTML = '<div class="empty-state">輸入股票代號查詢K線圖。</div>';
+    klineLayout = null;
+    return;
+  }
+
+  const data = aggregateKline(klineData, klinePeriodType);
+  const w = Math.max(680, data.length * 10);
+  const mainH = 280;
+  const volH = 80;
+  const gap = 30;
+  const indH = 90;
+  const showIndicator = klineIndicator !== 'none';
+  const totalH = mainH + gap + volH + (showIndicator ? gap + indH : 0) + 20;
+  const padLeft = 60, padRight = 14;
+  const plotW = w - padLeft - padRight;
+  const candleW = plotW / data.length;
+
+  const highs = data.map(d => d.high);
+  const lows = data.map(d => d.low);
+  const maxP = Math.max(...highs);
+  const minP = Math.min(...lows);
+  const priceRange = (maxP - minP) || 1;
+
+  function yForPrice(p){
+    return 10 + (1 - (p - minP) / priceRange) * (mainH - 20);
+  }
+
+  // 水平格線 + 價位數字（6條，含最高最低）
+  const GRID_LINES = 6;
+  let hGrid = '';
+  for(let i = 0; i <= GRID_LINES; i++){
+    const price = minP + (priceRange * i / GRID_LINES);
+    const y = yForPrice(price);
+    hGrid += `<line x1="${padLeft}" y1="${y}" x2="${w - padRight}" y2="${y}" stroke="#2C303C" stroke-width="1"/>`;
+    hGrid += `<text x="${padLeft - 8}" y="${y + 4}" font-size="11" fill="#8B90A3" font-family="'IBM Plex Mono', monospace" text-anchor="end">${price.toFixed(2)}</text>`;
+  }
+
+  // 垂直格線 + 日期數字（依資料長度抓約 6-8 個點）
+  const vTickCount = Math.min(8, data.length);
+  const vStep = Math.max(1, Math.floor(data.length / vTickCount));
+  const chartBottom = mainH + gap + volH + (showIndicator ? gap + indH : 0);
+  let vGrid = '';
+  for(let i = 0; i < data.length; i += vStep){
+    const x = padLeft + i * candleW + candleW / 2;
+    vGrid += `<line x1="${x}" y1="10" x2="${x}" y2="${chartBottom}" stroke="#2C303C" stroke-width="1"/>`;
+    vGrid += `<text x="${x}" y="${mainH + 16}" font-size="10" fill="#8B90A3" font-family="'IBM Plex Mono', monospace" text-anchor="middle">${klineDateLabel(data[i])}</text>`;
+  }
+
+  const maLines = [...klineMaSet].sort().map(period => {
+    const ma = calcMA(data, period);
+    const pts = ma.map((v, i) => v === null ? null : (padLeft + i * candleW + candleW / 2) + ',' + yForPrice(v)).filter(Boolean).join(' ');
+    return `<polyline points="${pts}" fill="none" stroke="${klineMaColors[period] || '#999'}" stroke-width="1.5"/>`;
+  }).join('');
+
+  const candles = data.map((d, i) => {
+    const x = padLeft + i * candleW;
+    const cx = x + candleW / 2;
+    const up = d.close >= d.open;
+    const color = up ? 'var(--up)' : 'var(--down)';
+    const yHigh = yForPrice(d.high);
+    const yLow = yForPrice(d.low);
+    const yOpen = yForPrice(d.open);
+    const yClose = yForPrice(d.close);
+    const bodyTop = Math.min(yOpen, yClose);
+    const bodyH = Math.max(Math.abs(yClose - yOpen), 1);
+    const bodyW = Math.max(candleW * 0.6, 1);
+    return `<line x1="${cx}" y1="${yHigh}" x2="${cx}" y2="${yLow}" stroke="${color}" stroke-width="1"/>` +
+           `<rect x="${cx - bodyW / 2}" y="${bodyTop}" width="${bodyW}" height="${bodyH}" fill="${color}"/>`;
+  }).join('');
+
+  const volTop = mainH + gap;
+  const maxV = Math.max(...data.map(d => d.volume), 1);
+  let vAxisLabels = '';
+  [0, 0.5, 1].forEach(f => {
+    const y = volTop + (volH - 10) * (1 - f) + 5;
+    vAxisLabels += `<text x="${padLeft - 8}" y="${y + 4}" font-size="10" fill="#8B90A3" font-family="'IBM Plex Mono', monospace" text-anchor="end">${Math.round(maxV * f / 1000).toLocaleString('zh-Hant-TW')}張</text>`;
+  });
+  const volBars = data.map((d, i) => {
+    const x = padLeft + i * candleW;
+    const cx = x + candleW / 2;
+    const up = d.close >= d.open;
+    const color = up ? 'var(--up)' : 'var(--down)';
+    const barH = (d.volume / maxV) * (volH - 10);
+    const bodyW = Math.max(candleW * 0.6, 1);
+    return `<rect x="${cx - bodyW / 2}" y="${volTop + (volH - 10 - barH)}" width="${bodyW}" height="${barH}" fill="${color}" opacity="0.75"/>`;
+  }).join('');
+
+  const legend = [...klineMaSet].sort().map(p => `<span style="color:${klineMaColors[p]};margin-right:12px;">— MA${p}</span>`).join('');
+
+  // ---------- 副圖指標（KD / MACD / RSI） ----------
+  let indicatorSvg = '';
+  let indicatorSeries = null;
+  const indTop = volTop + volH + gap;
+
+  if(klineIndicator === 'kd'){
+    const { k, d: dLine } = calcKD(data);
+    indicatorSeries = { type: 'kd', k, d: dLine };
+
+    function yForKD(v){ return indTop + (1 - v / 100) * (indH - 10) + 5; }
+
+    let refLines = '';
+    [20, 50, 80].forEach(v => {
+      const y = yForKD(v);
+      refLines += `<line x1="${padLeft}" y1="${y}" x2="${w - padRight}" y2="${y}" stroke="#2C303C" stroke-width="1" stroke-dasharray="2,2"/>`;
+      refLines += `<text x="${padLeft - 8}" y="${y + 3}" font-size="9" fill="#5B6072" font-family="'IBM Plex Mono', monospace" text-anchor="end">${v}</text>`;
+    });
+
+    const kPts = k.map((v, i) => v === null ? null : (padLeft + i * candleW + candleW / 2) + ',' + yForKD(v)).filter(Boolean).join(' ');
+    const dPts = dLine.map((v, i) => v === null ? null : (padLeft + i * candleW + candleW / 2) + ',' + yForKD(v)).filter(Boolean).join(' ');
+
+    indicatorSvg = refLines +
+      `<polyline points="${kPts}" fill="none" stroke="#5EC8D8" stroke-width="1.5"/>` +
+      `<polyline points="${dPts}" fill="none" stroke="#C9A227" stroke-width="1.5"/>` +
+      `<text x="${padLeft}" y="${indTop - 6}" font-size="11" fill="#8B90A3" font-family="'IBM Plex Mono', monospace"><tspan fill="#5EC8D8">K</tspan> <tspan fill="#C9A227">D</tspan>（9,3,3）</text>`;
+
+  }else if(klineIndicator === 'macd'){
+    const { macd, signal, histogram } = calcMACD(data);
+    indicatorSeries = { type: 'macd', macd, signal, histogram };
+
+    const allVals = [...macd, ...signal, ...histogram].filter(v => v !== null && !isNaN(v));
+    const maxAbs = Math.max(...allVals.map(Math.abs), 0.01);
+
+    function yForMacd(v){ return indTop + (1 - (v + maxAbs) / (maxAbs * 2)) * (indH - 10) + 5; }
+    const zeroY = yForMacd(0);
+
+    const histBars = histogram.map((v, i) => {
+      if(v === null) return '';
+      const x = padLeft + i * candleW;
+      const cx = x + candleW / 2;
+      const y = yForMacd(v);
+      const top = Math.min(y, zeroY);
+      const h = Math.max(Math.abs(y - zeroY), 1);
+      const bodyW = Math.max(candleW * 0.6, 1);
+      const color = v >= 0 ? 'var(--up)' : 'var(--down)';
+      return `<rect x="${cx - bodyW / 2}" y="${top}" width="${bodyW}" height="${h}" fill="${color}" opacity="0.6"/>`;
+    }).join('');
+
+    const macdPts = macd.map((v, i) => v === null ? null : (padLeft + i * candleW + candleW / 2) + ',' + yForMacd(v)).filter(Boolean).join(' ');
+    const signalPts = signal.map((v, i) => v === null ? null : (padLeft + i * candleW + candleW / 2) + ',' + yForMacd(v)).filter(Boolean).join(' ');
+
+    indicatorSvg = `<line x1="${padLeft}" y1="${zeroY}" x2="${w - padRight}" y2="${zeroY}" stroke="#2C303C" stroke-width="1"/>` +
+      histBars +
+      `<polyline points="${macdPts}" fill="none" stroke="#5EC8D8" stroke-width="1.5"/>` +
+      `<polyline points="${signalPts}" fill="none" stroke="#C9A227" stroke-width="1.5"/>` +
+      `<text x="${padLeft}" y="${indTop - 6}" font-size="11" fill="#8B90A3" font-family="'IBM Plex Mono', monospace"><tspan fill="#5EC8D8">MACD</tspan> <tspan fill="#C9A227">Signal</tspan>（12,26,9）</text>`;
+
+  }else if(klineIndicator === 'rsi'){
+    const rsi = calcRSI(data);
+    indicatorSeries = { type: 'rsi', rsi };
+
+    function yForRSI(v){ return indTop + (1 - v / 100) * (indH - 10) + 5; }
+
+    let refLines = '';
+    [30, 50, 70].forEach(v => {
+      const y = yForRSI(v);
+      refLines += `<line x1="${padLeft}" y1="${y}" x2="${w - padRight}" y2="${y}" stroke="#2C303C" stroke-width="1" stroke-dasharray="2,2"/>`;
+      refLines += `<text x="${padLeft - 8}" y="${y + 3}" font-size="9" fill="#5B6072" font-family="'IBM Plex Mono', monospace" text-anchor="end">${v}</text>`;
+    });
+
+    const pts = rsi.map((v, i) => v === null ? null : (padLeft + i * candleW + candleW / 2) + ',' + yForRSI(v)).filter(Boolean).join(' ');
+
+    indicatorSvg = refLines +
+      `<polyline points="${pts}" fill="none" stroke="#5EC8D8" stroke-width="1.5"/>` +
+      `<text x="${padLeft}" y="${indTop - 6}" font-size="11" fill="#8B90A3" font-family="'IBM Plex Mono', monospace"><tspan fill="#5EC8D8">RSI</tspan>（14）</text>`;
+  }
+
+  container.innerHTML = `
+    <div style="margin-bottom:8px;font-size:12px;font-family:'IBM Plex Mono', monospace;">${legend}<span style="color:#5B6072;">滑鼠移到圖上可看當天詳細數字</span></div>
+    <div style="position:relative;">
+      <div id="klineTooltip" style="position:absolute;display:none;background:#1A1D26;border:1px solid #2C303C;border-radius:6px;padding:10px 12px;font-family:'IBM Plex Mono', monospace;font-size:12px;line-height:1.7;pointer-events:none;z-index:10;white-space:nowrap;color:#8B90A3;box-shadow:0 4px 12px rgba(0,0,0,0.4);"></div>
+      <svg id="klineSvg" width="${w}" height="${totalH}" viewBox="0 0 ${w} ${totalH}" style="display:block;cursor:crosshair;">
+        ${hGrid}
+        ${vGrid}
+        ${candles}
+        ${maLines}
+        ${vAxisLabels}
+        ${volBars}
+        ${indicatorSvg}
+        <line id="klineCrosshairLine" x1="0" y1="0" x2="0" y2="${totalH}" stroke="#C9A227" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"/>
+      </svg>
+    </div>`;
+
+  klineLayout = { data, padLeft, candleW, w, totalH, indicatorSeries };
+
+  const svgEl = document.getElementById('klineSvg');
+  svgEl.addEventListener('mousemove', klineHandleMove);
+  svgEl.addEventListener('mouseleave', klineHandleLeave);
+}
+
+function klineHandleMove(evt){
+  if(!klineLayout) return;
+  const svgEl = evt.currentTarget;
+  const rect = svgEl.getBoundingClientRect();
+  const scaleX = klineLayout.w / rect.width;
+  const mouseX = (evt.clientX - rect.left) * scaleX;
+  let idx = Math.floor((mouseX - klineLayout.padLeft) / klineLayout.candleW);
+  idx = Math.max(0, Math.min(klineLayout.data.length - 1, idx));
+  const d = klineLayout.data[idx];
+  const cx = klineLayout.padLeft + idx * klineLayout.candleW + klineLayout.candleW / 2;
+
+  const crosshair = document.getElementById('klineCrosshairLine');
+  if(crosshair){
+    crosshair.setAttribute('x1', cx);
+    crosshair.setAttribute('x2', cx);
+    crosshair.setAttribute('visibility', 'visible');
+  }
+
+  const tooltip = document.getElementById('klineTooltip');
+  if(tooltip){
+    const up = d.close >= d.open;
+    let indicatorHtml = '';
+    const series = klineLayout.indicatorSeries;
+    if(series){
+      if(series.type === 'kd'){
+        const kv = series.k[idx], dv = series.d[idx];
+        if(kv !== null){
+          indicatorHtml = `<div style="border-top:1px solid #2C303C;margin-top:6px;padding-top:6px;">K　<span style="color:#5EC8D8;">${kv.toFixed(1)}</span>　D　<span style="color:#C9A227;">${dv.toFixed(1)}</span></div>`;
+        }
+      }else if(series.type === 'macd'){
+        const mv = series.macd[idx], sv = series.signal[idx], hv = series.histogram[idx];
+        if(mv !== null){
+          indicatorHtml = `<div style="border-top:1px solid #2C303C;margin-top:6px;padding-top:6px;">MACD　<span style="color:#5EC8D8;">${mv.toFixed(2)}</span><br>Signal　<span style="color:#C9A227;">${sv.toFixed(2)}</span><br>Hist　<span style="color:${hv >= 0 ? 'var(--up)' : 'var(--down)'};">${hv.toFixed(2)}</span></div>`;
+        }
+      }else if(series.type === 'rsi'){
+        const rv = series.rsi[idx];
+        if(rv !== null){
+          indicatorHtml = `<div style="border-top:1px solid #2C303C;margin-top:6px;padding-top:6px;">RSI　<span style="color:#5EC8D8;">${rv.toFixed(1)}</span></div>`;
+        }
+      }
+    }
+
+    tooltip.innerHTML = `
+      <div style="color:#ECEDF2;font-weight:600;margin-bottom:4px;">${d.date}${klinePeriodType !== 'day' ? '（' + (klinePeriodType === 'week' ? '當週' : '當月') + '）' : ''}</div>
+      <div>開　<span style="color:#ECEDF2;">${d.open.toFixed(2)}</span></div>
+      <div>高　<span style="color:var(--up);">${d.high.toFixed(2)}</span></div>
+      <div>低　<span style="color:var(--down);">${d.low.toFixed(2)}</span></div>
+      <div>收　<span style="color:${up ? 'var(--up)' : 'var(--down)'};">${d.close.toFixed(2)}</span></div>
+      <div>量　<span style="color:#8B90A3;">${d.volume.toLocaleString('zh-Hant-TW')}</span></div>
+      ${indicatorHtml}
+    `;
+    tooltip.style.display = 'block';
+
+    const wrapRect = svgEl.parentElement.getBoundingClientRect();
+    let left = (evt.clientX - wrapRect.left) + 14;
+    let top = (evt.clientY - wrapRect.top) - 10;
+    if(left + 140 > wrapRect.width) left -= 160; // 避免超出右邊界
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+  }
+}
+
+function klineHandleLeave(){
+  const crosshair = document.getElementById('klineCrosshairLine');
+  if(crosshair) crosshair.setAttribute('visibility', 'hidden');
+  const tooltip = document.getElementById('klineTooltip');
+  if(tooltip) tooltip.style.display = 'none';
+}
+
+function renderUpdatedTime(){
+  const el = document.getElementById('updatedTime');
+  const now = new Date();
+  el.textContent = '更新時間 ' + now.toLocaleString('zh-Hant-TW', { hour12:false });
+}
+
+// ---------- 法人籌碼＋大戶狀況 ----------
+function setInstStatus(text, kind){
+  const el = document.getElementById('instStatus');
+  el.textContent = text;
+  el.className = 'proxy-status' + (kind ? ' ' + kind : '');
+}
+
+document.getElementById('instBtn').addEventListener('click', () => {
+  const code = document.getElementById('instCodeInput').value.trim();
+  if(!code) return;
+  fetchInstitutional(code);
+  fetchFundamental(code);
+});
+
+async function fetchInstitutional(code){
+  if(!proxyUrl){
+    setInstStatus('請先在「個人存股表現」區塊貼上並儲存 GAS proxy 網址。', 'error');
+    return;
+  }
+
+  setInstStatus('抓取中...（要查10個交易日+集保大檔案，可能需要20-40秒，請耐心等候）', '');
+  document.getElementById('instCodeInput').value = code;
+
+  try{
+    const url = proxyUrl + '?type=institutional&code=' + encodeURIComponent(code);
+    const data = await fetchViaJsonp(url, 50000);
+
+    if(data.error){
+      setInstStatus('查詢失敗：' + data.error, 'error');
+      return;
+    }
+
+    renderInstitutionalChart(data.institutional || []);
+    renderInstitutionalTable(data.institutional || []);
+    renderHolderPanel(data.holders);
+    setInstStatus((data.code || code) + '　資料來源：證交所 T86（三大法人）＋ 集保結算所（大戶持股，僅支援上市股票）', 'ok');
+  }catch(err){
+    setInstStatus('抓取失敗：' + err.message, 'error');
+  }
+}
+
+// ---------- 融資融券、外資持股比率、基本資料、除權息、月營收 ----------
+async function fetchFundamental(code){
+  if(!proxyUrl) return;
+
+  document.getElementById('basicInfoPanel').innerHTML = '<div class="empty-state">抓取中...（融資融券+外資持股+基本資料+除權息+月營收，可能需要40-60秒，請耐心等候）</div>';
+  document.getElementById('marginChartContainer').innerHTML = '<div class="empty-state">抓取中...</div>';
+  document.getElementById('dividendsContainer').innerHTML = '<div class="empty-state">抓取中...</div>';
+  document.getElementById('revenueContainer').innerHTML = '<div class="empty-state">抓取中...</div>';
+
+  try{
+    const url = proxyUrl + '?type=fundamental&code=' + encodeURIComponent(code);
+    const data = await fetchViaJsonp(url, 100000);
+
+    renderBasicInfo(data.basicInfo, data.foreignHolding);
+    renderMarginChart(data.margin || []);
+    renderMarginTable(data.margin || []);
+    renderDividends(data.dividends);
+    renderRevenue(data.revenue);
+  }catch(err){
+    document.getElementById('basicInfoPanel').innerHTML = `<div class="empty-state">基本面資料抓取失敗：${err.message}</div>`;
+  }
+}
+
+function renderBasicInfo(basicInfo, foreignHolding){
+  const panel = document.getElementById('basicInfoPanel');
+  let html = '';
+
+  if(basicInfo && !basicInfo.error){
+    const rows = [
+      ['公司名稱', basicInfo['公司名稱']],
+      ['產業別', basicInfo['產業別']],
+      ['董事長', basicInfo['董事長']],
+      ['總經理', basicInfo['總經理']],
+      ['成立日期', basicInfo['成立日期']],
+      ['上市日期', basicInfo['上市日期']],
+      ['實收資本額', basicInfo['實收資本額'] ? Number(basicInfo['實收資本額']).toLocaleString('zh-Hant-TW') : '—'],
+      ['網址', basicInfo['網址']]
+    ].filter(r => r[1]);
+    html += `<div class="holder-grid">` + rows.map(r => `
+      <div class="holder-card" style="padding:10px 14px;">
+        <div class="label">${r[0]}</div>
+        <div style="font-size:14px;">${r[1]}</div>
+      </div>`).join('') + `</div>`;
+  }else{
+    html += `<div class="empty-state">基本資料：${basicInfo && basicInfo.error ? basicInfo.error : '查無資料'}</div>`;
+  }
+
+  if(foreignHolding && !foreignHolding.error){
+    html += `
+      <div class="holder-grid" style="margin-top:12px;">
+        <div class="holder-card">
+          <div class="label">外資持股比率</div>
+          <div class="value" style="color:var(--up);">${foreignHolding.foreignHoldRatio.toFixed(2)}%</div>
+          <div class="sub">資料日期：${foreignHolding.date}</div>
+        </div>
+        <div class="holder-card">
+          <div class="label">外資尚可投資比率</div>
+          <div class="value">${foreignHolding.availableRatio.toFixed(2)}%</div>
+        </div>
+        <div class="holder-card">
+          <div class="label">外資持有股數</div>
+          <div class="value">${(foreignHolding.foreignHeldShares / 1000).toLocaleString('zh-Hant-TW', {maximumFractionDigits:0})}<span style="font-size:12px;color:var(--text-tertiary);">張</span></div>
+        </div>
+      </div>`;
+  }
+
+  panel.innerHTML = html || '<div class="empty-state">查無資料。</div>';
+}
+
+function renderMarginChart(days){
+  const container = document.getElementById('marginChartContainer');
+  if(!days || days.length === 0){
+    container.innerHTML = '<div class="empty-state">查無資料。</div>';
+    return;
+  }
+
+  const w = Math.max(600, days.length * 60);
+  const h = 200;
+  const padLeft = 60, padRight = 14, padTop = 20, padBottom = 30;
+  const plotH = h - padTop - padBottom;
+  const barGroupW = (w - padLeft - padRight) / days.length;
+
+  const marginNet = days.map(d => (d.marginBuy - d.marginSell) / 1000);
+  const maxAbs = Math.max(...marginNet.map(Math.abs), 1);
+  const zeroY = padTop + plotH / 2;
+  const yFor = (v) => zeroY - (v / maxAbs) * (plotH / 2);
+
+  let bars = '', xLabels = '';
+  days.forEach((d, i) => {
+    const x = padLeft + i * barGroupW;
+    const cx = x + barGroupW / 2;
+    const net = (d.marginBuy - d.marginSell) / 1000;
+    const y = yFor(net);
+    const top = Math.min(y, zeroY);
+    const barH = Math.max(Math.abs(y - zeroY), 1);
+    const bodyW = Math.max(barGroupW * 0.5, 3);
+    const color = net >= 0 ? 'var(--up)' : 'var(--down)';
+    bars += `<rect x="${cx - bodyW/2}" y="${top}" width="${bodyW}" height="${barH}" fill="${color}" opacity="0.85"/>`;
+    xLabels += `<text x="${cx}" y="${h - 10}" font-size="10" fill="#8B90A3" font-family="'IBM Plex Mono', monospace" text-anchor="middle">${d.date.slice(5)}</text>`;
+  });
+
+  container.innerHTML = `
+    <div style="margin-bottom:8px;font-size:12px;font-family:'IBM Plex Mono', monospace;color:#5B6072;">融資買賣超（張），紅色為增加、綠色為減少</div>
+    <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block;">
+      <line x1="${padLeft}" y1="${zeroY}" x2="${w - padRight}" y2="${zeroY}" stroke="#2C303C" stroke-width="1"/>
+      ${bars}
+      ${xLabels}
+    </svg>`;
+}
+
+function renderMarginTable(days){
+  const body = document.getElementById('marginBody');
+  if(!days || days.length === 0){
+    body.innerHTML = `<tr><td colspan="7"><div class="empty-state">查無資料。</div></td></tr>`;
+    return;
+  }
+  const lots = (v) => (v / 1000).toLocaleString('zh-Hant-TW', { maximumFractionDigits: 0 });
+  const sorted = days.slice().reverse();
+  body.innerHTML = sorted.map(d => `
+    <tr>
+      <td>${d.date}</td>
+      <td class="num">${lots(d.marginBuy)}</td>
+      <td class="num">${lots(d.marginSell)}</td>
+      <td class="num" style="font-weight:700;">${lots(d.marginBalance)}</td>
+      <td class="num">${lots(d.shortBuy)}</td>
+      <td class="num">${lots(d.shortSell)}</td>
+      <td class="num" style="font-weight:700;">${lots(d.shortBalance)}</td>
+    </tr>`).join('') +
+    `<tr><td colspan="7" style="font-size:11px;color:var(--text-tertiary);">單位：張</td></tr>`;
+}
+
+function formatFundamentalValue(key, value){
+  if(value === null || value === undefined || value === '') return '—';
+  const strVal = String(value).trim();
+
+  // ROC 日期（7位數 YYYMMDD，例如 出表日期）
+  if(/日期$/.test(key) && /^\d{7}$/.test(strVal)){
+    const rocYear = parseInt(strVal.slice(0, 3), 10);
+    return (rocYear + 1911) + '-' + strVal.slice(3, 5) + '-' + strVal.slice(5, 7);
+  }
+  // ROC 年月（5位數 YYYMM，例如 資料年月）
+  if(/年月$/.test(key) && /^\d{5}$/.test(strVal)){
+    const rocYear = parseInt(strVal.slice(0, 3), 10);
+    return (rocYear + 1911) + '-' + strVal.slice(3, 5);
+  }
+  // 百分比／增減欄位：四捨五入到2位小數
+  if(/[%（(]/.test(key) && !isNaN(parseFloat(strVal)) && strVal.indexOf('.') !== -1){
+    return parseFloat(strVal).toFixed(2) + (key.indexOf('%') !== -1 ? '%' : '');
+  }
+  // 純數字的金額／股數欄位：加千分位
+  if(/^-?\d+(\.\d+)?$/.test(strVal) && strVal.replace('-', '').replace('.', '').length >= 4){
+    const num = parseFloat(strVal);
+    return num.toLocaleString('zh-Hant-TW', { maximumFractionDigits: Number.isInteger(num) ? 0 : 2 });
+  }
+  return strVal;
+}
+
+function renderGenericTable(container, rows, emptyMsg){
+  if(!rows || rows.error || rows.length === 0){
+    container.innerHTML = `<div class="empty-state">${(rows && rows.error) || emptyMsg}</div>`;
+    return;
+  }
+
+  const keys = Object.keys(rows[0]);
+  const thead = keys.map(k => `<th style="white-space:nowrap;">${k}</th>`).join('');
+  const tbody = rows.map(row => `<tr>${keys.map(k => `<td style="white-space:nowrap;">${formatFundamentalValue(k, row[k])}</td>`).join('')}</tr>`).join('');
+
+  container.innerHTML = `<div style="overflow-x:auto;"><table style="width:max-content;min-width:100%;"><thead><tr>${thead}</tr></thead><tbody>${tbody}</tbody></table></div>`;
+}
+
+function renderDividends(dividends){
+  renderGenericTable(document.getElementById('dividendsContainer'), dividends, '查無股利分派資料。');
+}
+
+function renderRevenue(revenue){
+  renderGenericTable(document.getElementById('revenueContainer'), revenue, '查無月營收資料。');
+}
+
+function renderInstitutionalTable(days){
+  const body = document.getElementById('instBody');
+
+  if(!days || days.length === 0){
+    body.innerHTML = `<tr><td colspan="5"><div class="empty-state">查無資料。</div></td></tr>`;
+    return;
+  }
+
+  const lots = (shares) => (shares / 1000).toLocaleString('zh-Hant-TW', { maximumFractionDigits: 0 });
+  const cell = (v) => `<span class="${pctColor(v)}">${v > 0 ? '+' : ''}${lots(v)}</span>`;
+
+  const sorted = days.slice().reverse(); // 最新日期排最上面
+
+  body.innerHTML = sorted.map(d => `
+    <tr>
+      <td>${d.date}</td>
+      <td class="num">${cell(d.foreign)}</td>
+      <td class="num">${cell(d.trust)}</td>
+      <td class="num">${cell(d.dealer)}</td>
+      <td class="num" style="font-weight:700;">${cell(d.total)}</td>
+    </tr>`).join('') +
+    `<tr><td colspan="5" style="font-size:11px;color:var(--text-tertiary);">單位：張（正值為買超，負值為賣超）</td></tr>`;
+}
+
+function renderInstitutionalChart(days){
+  const container = document.getElementById('instChartContainer');
+
+  if(!days || days.length === 0){
+    container.innerHTML = '<div class="empty-state">查無資料。</div>';
+    return;
+  }
+
+  const w = Math.max(600, days.length * 70);
+  const h = 240;
+  const padLeft = 60, padRight = 14, padTop = 20, padBottom = 30;
+  const plotH = h - padTop - padBottom;
+  const groupW = (w - padLeft - padRight) / days.length;
+
+  const allVals = [];
+  days.forEach(d => { allVals.push(d.foreign / 1000, d.trust / 1000, d.dealer / 1000); });
+  const maxAbs = Math.max(...allVals.map(Math.abs), 1);
+  const zeroY = padTop + plotH / 2;
+
+  function yForVal(v){ return zeroY - (v / maxAbs) * (plotH / 2); }
+
+  const series = [
+    { key: 'foreign', color: '#5EC8D8', label: '外資' },
+    { key: 'trust', color: '#C9A227', label: '投信' },
+    { key: 'dealer', color: '#B57EDC', label: '自營商' }
+  ];
+
+  let bars = '';
+  let xLabels = '';
+
+  days.forEach((d, i) => {
+    const groupX = padLeft + i * groupW;
+    const barW = Math.max((groupW * 0.7) / 3, 3);
+    const gap = (groupW * 0.3) / 4;
+
+    series.forEach((s, si) => {
+      const val = d[s.key] / 1000; // 換算成張
+      const x = groupX + gap + si * (barW + gap * 0.3);
+      const y = yForVal(val);
+      const top = Math.min(y, zeroY);
+      const barH = Math.max(Math.abs(y - zeroY), 1);
+      bars += `<rect x="${x}" y="${top}" width="${barW}" height="${barH}" fill="${s.color}" opacity="0.85"/>`;
+    });
+
+    xLabels += `<text x="${groupX + groupW / 2}" y="${h - 10}" font-size="10" fill="#8B90A3" font-family="'IBM Plex Mono', monospace" text-anchor="middle">${d.date.slice(5)}</text>`;
+  });
+
+  const legend = series.map(s => `<span style="color:${s.color};margin-right:12px;">— ${s.label}</span>`).join('');
+
+  container.innerHTML = `
+    <div style="margin-bottom:8px;font-size:12px;font-family:'IBM Plex Mono', monospace;">${legend}<span style="color:#5B6072;">單位：張</span></div>
+    <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block;">
+      <line x1="${padLeft}" y1="${zeroY}" x2="${w - padRight}" y2="${zeroY}" stroke="#2C303C" stroke-width="1"/>
+      ${bars}
+      ${xLabels}
+    </svg>`;
+}
+
+function renderHolderPanel(holders){
+  const panel = document.getElementById('instHolderPanel');
+
+  if(!holders || holders.error){
+    panel.innerHTML = holders && holders.error
+      ? `<div class="empty-state">大戶持股資料：${holders.error}</div>`
+      : '';
+    return;
+  }
+
+  const bars = holders.brackets
+    .slice().sort((a, b) => a.level - b.level)
+    .map(b => {
+      const maxPct = Math.max(...holders.brackets.map(x => x.pct), 1);
+      const heightPct = Math.max((b.pct / maxPct) * 100, 2);
+      const isBig = b.level >= 12;
+      return `<div class="bracket-bar ${isBig ? 'big' : ''}" style="height:${heightPct}%;" title="第${b.level}級：${b.pct.toFixed(2)}%，${b.holders.toLocaleString('zh-Hant-TW')}人"></div>`;
+    }).join('');
+
+  panel.innerHTML = `
+    <div class="holder-grid">
+      <div class="holder-card">
+        <div class="label">千張大戶佔比（1,000張以上）</div>
+        <div class="value" style="color:var(--up);">${holders.concentration1000Lots.toFixed(2)}%</div>
+        <div class="sub">資料日期：${holders.asOfDate}</div>
+      </div>
+      <div class="holder-card">
+        <div class="label">大戶佔比（400張以上）</div>
+        <div class="value" style="color:var(--up);">${holders.concentration400Lots.toFixed(2)}%</div>
+        <div class="sub">集保戶股權分散表，每週更新一次</div>
+      </div>
+      <div class="holder-card">
+        <div class="label">持股分級分布（第1～15級）</div>
+        <div class="bracket-bars">${bars}</div>
+        <div class="sub">橘色以下為一般持股，紅色為400張以上大戶級距</div>
+      </div>
+    </div>`;
+}
+
+// ---------- 台股行事曆：除權息 ----------
+let calendarData = null;
+let calendarRangeDays = 30;
+let calendarViewMode = 'grid'; // 'grid' | 'list'
+let calendarViewDate = new Date();
+let calendarSelectedDate = null;
+
+function setCalendarStatus(text, kind){
+  const el = document.getElementById('calendarStatus');
+  el.textContent = text;
+  el.className = 'proxy-status' + (kind ? ' ' + kind : '');
+}
+
+document.getElementById('calendarViewTabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('.tab-btn');
+  if(!btn) return;
+  calendarViewMode = btn.dataset.view;
+  document.querySelectorAll('#calendarViewTabs .tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+  document.getElementById('calendarGridView').style.display = calendarViewMode === 'grid' ? 'block' : 'none';
+  document.getElementById('calendarRangeTabs').style.display = calendarViewMode === 'list' ? 'flex' : 'none';
+  document.getElementById('calendarDayLabel').style.display = calendarViewMode === 'grid' ? 'block' : 'none';
+
+  if(calendarViewMode === 'grid'){
+    renderCalendarGrid();
+    renderCalendarDayDetail();
+  }else{
+    renderCalendar();
+  }
+});
+
+document.getElementById('calPrevMonth').addEventListener('click', () => {
+  calendarViewDate.setMonth(calendarViewDate.getMonth() - 1);
+  renderCalendarGrid();
+});
+document.getElementById('calNextMonth').addEventListener('click', () => {
+  calendarViewDate.setMonth(calendarViewDate.getMonth() + 1);
+  renderCalendarGrid();
+});
+
+document.getElementById('calendarRangeTabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('.tab-btn');
+  if(!btn) return;
+  calendarRangeDays = parseInt(btn.dataset.days, 10);
+  document.querySelectorAll('#calendarRangeTabs .tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+  renderCalendar();
+});
+
+document.getElementById('calendarBtn').addEventListener('click', fetchCalendar);
+document.getElementById('calendarCodeInput').addEventListener('input', () => {
+  if(!calendarData) return;
+  if(calendarViewMode === 'grid'){
+    renderCalendarGrid();
+    renderCalendarDayDetail();
+  }else{
+    renderCalendar();
+  }
+});
+
+async function fetchCalendar(){
+  if(!proxyUrl){
+    setCalendarStatus('請先在「個人存股表現」區塊貼上並儲存 GAS proxy 網址。', 'error');
+    return;
+  }
+
+  setCalendarStatus('抓取中...', '');
+
+  try{
+    const url = proxyUrl + '?type=calendar';
+    const data = await fetchViaJsonp(url, 30000);
+
+    if(data.error || !data.list){
+      setCalendarStatus('查詢失敗：' + (data.error || '查無資料'), 'error');
+      return;
+    }
+
+    calendarData = data.list;
+    setCalendarStatus('共 ' + calendarData.length + ' 筆（資料來源：證交所除權除息預告表，僅上市股票）', 'ok');
+
+    if(calendarViewMode === 'grid'){
+      renderCalendarGrid();
+      renderCalendarDayDetail();
+    }else{
+      renderCalendar();
+    }
+  }catch(err){
+    setCalendarStatus('抓取失敗：' + err.message, 'error');
+  }
+}
+
+function renderCalendarGrid(){
+  const grid = document.getElementById('calendarGrid');
+  const label = document.getElementById('calMonthLabel');
+  const year = calendarViewDate.getFullYear();
+  const month = calendarViewDate.getMonth(); // 0-indexed
+  label.textContent = year + '年' + (month + 1) + '月';
+
+  if(!calendarData){
+    grid.innerHTML = '';
+    return;
+  }
+
+  const code = document.getElementById('calendarCodeInput').value.trim();
+  const eventsByDate = {};
+  calendarData.forEach(r => {
+    if(code && r.code !== code) return;
+    if(!eventsByDate[r.date]) eventsByDate[r.date] = [];
+    eventsByDate[r.date].push(r);
+  });
+
+  const firstDay = new Date(year, month, 1);
+  const startWeekday = firstDay.getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  let html = ['日', '一', '二', '三', '四', '五', '六'].map(d => `<div class="cal-weekday">${d}</div>`).join('');
+
+  for(let i = 0; i < startWeekday; i++){
+    html += `<div class="cal-cell empty"></div>`;
+  }
+
+  for(let day = 1; day <= daysInMonth; day++){
+    const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+    const events = eventsByDate[dateStr] || [];
+    const classes = ['cal-cell'];
+    if(dateStr === todayStr) classes.push('today');
+    if(dateStr === calendarSelectedDate) classes.push('selected');
+
+    const chips = events.slice(0, 3).map(e => `<div class="cal-chip">${e.code}</div>`).join('');
+    const more = events.length > 3 ? `<div class="cal-chip-more">+${events.length - 3}</div>` : '';
+
+    html += `<div class="${classes.join(' ')}" data-date="${dateStr}">
+      <div class="cal-day-num">${day}</div>
+      <div class="cal-chips">${chips}${more}</div>
+    </div>`;
+  }
+
+  grid.innerHTML = html;
+
+  grid.querySelectorAll('.cal-cell[data-date]').forEach(cell => {
+    cell.addEventListener('click', () => {
+      calendarSelectedDate = cell.dataset.date;
+      renderCalendarGrid();
+      renderCalendarDayDetail();
+    });
+  });
+}
+
+function renderCalendarDayDetail(){
+  const body = document.getElementById('calendarBody');
+  const dayLabel = document.getElementById('calendarDayLabel');
+
+  if(!calendarSelectedDate){
+    dayLabel.textContent = '點選月曆上的日期，查看當天的除權息股票';
+    body.innerHTML = `<tr><td colspan="6"><div class="empty-state">點選上方月曆的日期查看詳細清單。</div></td></tr>`;
+    return;
+  }
+
+  dayLabel.textContent = calendarSelectedDate + ' 的除權息股票';
+
+  const code = document.getElementById('calendarCodeInput').value.trim();
+  const list = (calendarData || []).filter(r => r.date === calendarSelectedDate && (!code || r.code === code));
+
+  if(list.length === 0){
+    body.innerHTML = `<tr><td colspan="6"><div class="empty-state">這天沒有除權息資料。</div></td></tr>`;
+    return;
+  }
+
+  body.innerHTML = list.map(r => `
+    <tr class="clickable-row" data-code="${r.code}">
+      <td>${r.date}</td>
+      <td class="code">${r.code}</td>
+      <td>${r.name}</td>
+      <td><span class="tag">${r.type}</span></td>
+      <td class="num">${r.cashDividend !== null ? r.cashDividend.toFixed(4) : '待公告'}</td>
+      <td class="num">${r.stockDividendRatio > 0 ? (r.stockDividendRatio * 100).toFixed(2) + '%' : '—'}</td>
+    </tr>`).join('');
+}
+
+function renderCalendar(){
+  const body = document.getElementById('calendarBody');
+
+  if(!calendarData){
+    body.innerHTML = `<tr><td colspan="6"><div class="empty-state">按「查詢除權息日曆」載入資料。</div></td></tr>`;
+    return;
+  }
+
+  const code = document.getElementById('calendarCodeInput').value.trim();
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const cutoff = new Date(today.getTime() + calendarRangeDays * 24 * 60 * 60 * 1000);
+
+  let filtered = calendarData.filter(r => {
+    if(code && r.code !== code) return false;
+    if(calendarRangeDays < 9999){
+      const d = new Date(r.date);
+      if(d < today || d > cutoff) return false;
+    }
+    return true;
+  });
+
+  filtered.sort((a, b) => a.date.localeCompare(b.date));
+
+  if(filtered.length === 0){
+    body.innerHTML = `<tr><td colspan="6"><div class="empty-state">這個範圍內沒有符合的除權息資料。</div></td></tr>`;
+    return;
+  }
+
+  body.innerHTML = filtered.map(r => `
+    <tr class="clickable-row" data-code="${r.code}">
+      <td>${r.date}</td>
+      <td class="code">${r.code}</td>
+      <td>${r.name}</td>
+      <td><span class="tag">${r.type}</span></td>
+      <td class="num">${r.cashDividend !== null ? r.cashDividend.toFixed(4) : '待公告'}</td>
+      <td class="num">${r.stockDividendRatio > 0 ? (r.stockDividendRatio * 100).toFixed(2) + '%' : '—'}</td>
+    </tr>`).join('');
+}
+
+document.getElementById('calendarBody').addEventListener('click', (e) => {
+  const row = e.target.closest('.clickable-row');
+  if(!row) return;
+  jumpToKline(row.dataset.code);
+});
+
+// ---------- 策略選股 ----------
+function setStrategyStatus(text, kind){
+  const el = document.getElementById('strategyStatus');
+  el.textContent = text;
+  el.className = 'proxy-status' + (kind ? ' ' + kind : '');
+}
+
+document.getElementById('strategyRefreshBtn').addEventListener('click', fetchStrategyStatus);
+
+async function fetchStrategyStatus(){
+  if(!proxyUrl){
+    setStrategyStatus('請先在「個人存股表現」區塊貼上並儲存 GAS proxy 網址。', 'error');
+    return;
+  }
+
+  setStrategyStatus('查詢中...', '');
+
+  try{
+    const url = proxyUrl + '?type=strategyStatus';
+    const data = await fetchViaJsonp(url, 30000);
+
+    if(data.error){
+      setStrategyStatus('查詢失敗：' + data.error, 'error');
+      return;
+    }
+
+    renderStrategyProgress(data.daysCollected);
+    renderStrategyOpen(data.openPositions || []);
+    renderStrategyClosed(data.closedPositions || []);
+    setStrategyStatus('已更新（已累積 ' + data.daysCollected + ' 個交易日的市場快照）', 'ok');
+  }catch(err){
+    setStrategyStatus('抓取失敗：' + err.message, 'error');
+  }
+}
+
+function renderStrategyProgress(daysCollected){
+  const panel = document.getElementById('strategyProgressPanel');
+  const needed = 5;
+
+  if(daysCollected >= needed){
+    panel.innerHTML = `<div class="holder-card" style="max-width:320px;">
+      <div class="label">資料累積進度</div>
+      <div class="value" style="color:var(--up);">已足夠（${daysCollected} 天）</div>
+      <div class="sub">選股邏輯正常運作中</div>
+    </div>`;
+    return;
+  }
+
+  const pct = Math.min(100, Math.round((daysCollected / needed) * 100));
+  panel.innerHTML = `<div class="holder-card" style="max-width:320px;">
+    <div class="label">資料累積進度</div>
+    <div class="value">${daysCollected} / ${needed} 天</div>
+    <div class="sub">還需要 ${Math.max(0, needed - daysCollected)} 個交易日，選股邏輯才會開始篩選（每天下午自動累積一次）</div>
+  </div>`;
+}
+
+function renderStrategyOpen(positions){
+  const body = document.getElementById('strategyOpenBody');
+  if(!positions || positions.length === 0){
+    body.innerHTML = `<tr><td colspan="5"><div class="empty-state">目前沒有持有中的部位。</div></td></tr>`;
+    return;
+  }
+
+  body.innerHTML = positions.map(p => `
+    <tr class="clickable-row" data-code="${p.code}">
+      <td><div>${p.name}</div><div class="code">${p.code}</div></td>
+      <td>${p.entryDate}</td>
+      <td class="num">${fmt(p.entryPrice, p.entryPrice > 1000 ? 0 : 2)}</td>
+      <td class="num">${fmt(p.entryMA5, p.entryMA5 > 1000 ? 0 : 2)}</td>
+      <td class="num">${p.daysHeld} / 3</td>
+    </tr>`).join('');
+}
+
+function renderStrategyClosed(positions){
+  const body = document.getElementById('strategyClosedBody');
+  if(!positions || positions.length === 0){
+    body.innerHTML = `<tr><td colspan="7"><div class="empty-state">尚無出場紀錄。</div></td></tr>`;
+    return;
+  }
+
+  body.innerHTML = positions.map(p => {
+    const pnlPct = (p.exitPrice - p.entryPrice) / p.entryPrice * 100;
+    return `
+    <tr class="clickable-row" data-code="${p.code}">
+      <td><div>${p.name}</div><div class="code">${p.code}</div></td>
+      <td>${p.entryDate}</td>
+      <td class="num">${fmt(p.entryPrice, p.entryPrice > 1000 ? 0 : 2)}</td>
+      <td>${p.exitDate}</td>
+      <td class="num">${fmt(p.exitPrice, p.exitPrice > 1000 ? 0 : 2)}</td>
+      <td class="num ${pctColor(pnlPct)}">${pnlPct > 0 ? '+' : ''}${fmt(pnlPct,2)}%</td>
+      <td><span class="tag">${p.exitReason}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+document.getElementById('strategyOpenBody').addEventListener('click', (e) => {
+  const row = e.target.closest('.clickable-row');
+  if(!row) return;
+  jumpToKline(row.dataset.code);
+});
+document.getElementById('strategyClosedBody').addEventListener('click', (e) => {
+  const row = e.target.closest('.clickable-row');
+  if(!row) return;
+  jumpToKline(row.dataset.code);
+});
+
+renderTicker();
+renderIndices();
+renderTrending();
+renderUpdatedTime();
+
+(async () => {
+  await loadProxyUrl();
+  showLoggedOutUI();
+  if(proxyUrl){
+    refreshAllData();
+  }
+})();
+</script>
+
+</body>
+</html>
