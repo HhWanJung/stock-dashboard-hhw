@@ -887,8 +887,16 @@ tbody tr:hover{ background:var(--bg-raised); }
     </div>
 
     <div class="demo-banner" style="margin-bottom:1.5rem;">
-      <b>策略邏輯</b>：全市場掃描（排除ETF）。<b>進場</b>：股價站上5日均線，且當日成交量大於前5日均量。<b>出場</b>：進場後最多持有3個交易日，若期間跌破「進場當天的5日均線」提前停損，撐滿3天則不論盈虧出場。<br>
-      <b>資料限制</b>：這是每天累積一次的市場快照（證交所沒有全市場多日歷史 API），需要累積滿 <b>5個交易日</b> 資料才會開始篩選，累積前只會顯示目前進度。
+      <b>出場規則（固定）</b>：進場後最多持有3個交易日，若期間跌破「進場當天的5日均線」提前停損，撐滿3天則不論盈虧出場。<br>
+      <b>資料限制</b>：這是每天累積一次的市場快照，需要累積滿 <b>5個交易日</b> 資料才會開始篩選；法人連續買超條件另外累積法人快照。<br>
+      <b>⚠️ 全站共用</b>：下面的篩選條件是所有登入者共用的設定，不分帳號各自設定。
+    </div>
+
+    <div class="table-wrap" style="padding:16px;margin-bottom:20px;">
+      <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:10px;">進場篩選條件（可複選，全部符合才算命中）</div>
+      <div id="criteriaCheckboxes" style="display:flex;flex-direction:column;gap:8px;"></div>
+      <button id="saveCriteriaBtn" class="primary" style="margin-top:12px;background:var(--accent);color:#1A1500;border:none;border-radius:6px;padding:8px 16px;font-weight:700;font-size:13px;cursor:pointer;">儲存篩選條件</button>
+      <div class="proxy-status" id="criteriaStatus"></div>
     </div>
 
     <button id="strategyRefreshBtn" class="primary" style="background:var(--accent);color:#1A1500;border:none;border-radius:6px;padding:8px 16px;font-weight:700;font-size:13px;cursor:pointer;margin-bottom:12px;">重新查詢狀態</button>
@@ -2928,7 +2936,50 @@ function setStrategyStatus(text, kind){
   el.className = 'proxy-status' + (kind ? ' ' + kind : '');
 }
 
+function setCriteriaStatus(text, kind){
+  const el = document.getElementById('criteriaStatus');
+  el.textContent = text;
+  el.className = 'proxy-status' + (kind ? ' ' + kind : '');
+}
+
 document.getElementById('strategyRefreshBtn').addEventListener('click', fetchStrategyStatus);
+
+document.getElementById('saveCriteriaBtn').addEventListener('click', async () => {
+  if(!proxyUrl){
+    setCriteriaStatus('請先在「個人存股表現」區塊貼上並儲存 GAS proxy 網址。', 'error');
+    return;
+  }
+
+  const checked = Array.from(document.querySelectorAll('#criteriaCheckboxes input[type="checkbox"]:checked')).map(el => el.value);
+  if(checked.length === 0){
+    setCriteriaStatus('請至少勾選一種篩選條件。', 'error');
+    return;
+  }
+
+  setCriteriaStatus('儲存中...', '');
+  try{
+    const url = proxyUrl + '?type=setStrategyCriteria&criteria=' + encodeURIComponent(checked.join(','));
+    const result = await fetchViaJsonp(url, 20000);
+    if(!result.ok){
+      setCriteriaStatus('儲存失敗：' + result.error, 'error');
+      return;
+    }
+    setCriteriaStatus('已儲存，明天排程開始會套用新條件（今天已經跑過的不會重跑）。', 'ok');
+  }catch(err){
+    setCriteriaStatus('儲存失敗：' + err.message, 'error');
+  }
+});
+
+function renderCriteriaCheckboxes(options, selected){
+  const container = document.getElementById('criteriaCheckboxes');
+  const selectedSet = new Set(selected || []);
+
+  container.innerHTML = Object.keys(options).map(key => `
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+      <input type="checkbox" value="${key}" ${selectedSet.has(key) ? 'checked' : ''}>
+      ${options[key]}
+    </label>`).join('');
+}
 
 async function fetchStrategyStatus(){
   if(!proxyUrl){
@@ -2947,34 +2998,47 @@ async function fetchStrategyStatus(){
       return;
     }
 
-    renderStrategyProgress(data.daysCollected);
+    if(data.criteriaOptions){
+      renderCriteriaCheckboxes(data.criteriaOptions, data.criteria);
+    }
+
+    renderStrategyProgress(data.daysCollected, data.instDaysCollected);
     renderStrategyOpen(data.openPositions || []);
     renderStrategyClosed(data.closedPositions || []);
-    setStrategyStatus('已更新（已累積 ' + data.daysCollected + ' 個交易日的市場快照）', 'ok');
+    setStrategyStatus('已更新（已累積 ' + data.daysCollected + ' 個交易日的市場快照，法人快照 ' + (data.instDaysCollected || 0) + ' 天）', 'ok');
   }catch(err){
     setStrategyStatus('抓取失敗：' + err.message, 'error');
   }
 }
 
-function renderStrategyProgress(daysCollected){
+function renderStrategyProgress(daysCollected, instDaysCollected){
   const panel = document.getElementById('strategyProgressPanel');
   const needed = 5;
+  const instNeeded = 3;
 
-  if(daysCollected >= needed){
-    panel.innerHTML = `<div class="holder-card" style="max-width:320px;">
-      <div class="label">資料累積進度</div>
-      <div class="value" style="color:var(--up);">已足夠（${daysCollected} 天）</div>
-      <div class="sub">選股邏輯正常運作中</div>
-    </div>`;
-    return;
-  }
+  const priceCard = daysCollected >= needed
+    ? `<div class="holder-card">
+        <div class="label">價量快照進度</div>
+        <div class="value" style="color:var(--up);">已足夠（${daysCollected} 天）</div>
+      </div>`
+    : `<div class="holder-card">
+        <div class="label">價量快照進度</div>
+        <div class="value">${daysCollected} / ${needed} 天</div>
+        <div class="sub">還需要 ${Math.max(0, needed - daysCollected)} 個交易日</div>
+      </div>`;
 
-  const pct = Math.min(100, Math.round((daysCollected / needed) * 100));
-  panel.innerHTML = `<div class="holder-card" style="max-width:320px;">
-    <div class="label">資料累積進度</div>
-    <div class="value">${daysCollected} / ${needed} 天</div>
-    <div class="sub">還需要 ${Math.max(0, needed - daysCollected)} 個交易日，選股邏輯才會開始篩選（每天下午自動累積一次）</div>
-  </div>`;
+  const instCard = (instDaysCollected || 0) >= instNeeded
+    ? `<div class="holder-card">
+        <div class="label">法人快照進度</div>
+        <div class="value" style="color:var(--up);">已足夠（${instDaysCollected} 天）</div>
+      </div>`
+    : `<div class="holder-card">
+        <div class="label">法人快照進度</div>
+        <div class="value">${instDaysCollected || 0} / ${instNeeded} 天</div>
+        <div class="sub">「法人連續買超」條件需要這個</div>
+      </div>`;
+
+  panel.innerHTML = `<div class="holder-grid">${priceCard}${instCard}</div>`;
 }
 
 function renderStrategyOpen(positions){
