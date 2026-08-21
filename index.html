@@ -956,14 +956,26 @@ tbody tr:hover{ background:var(--bg-raised); }
     <div class="tabs" id="summaryTabs">
       <button class="tab-btn active" data-period="premarket">盤前摘要</button>
       <button class="tab-btn" data-period="postmarket">盤後摘要</button>
+      <button class="tab-btn" data-period="holdings">持股摘要</button>
     </div>
 
-    <button id="summaryRefreshBtn" class="primary" style="background:var(--accent);color:#1A1500;border:none;border-radius:6px;padding:8px 16px;font-weight:700;font-size:13px;cursor:pointer;margin:12px 0;">產生摘要</button>
+    <div id="marketSummaryView">
+      <button id="summaryRefreshBtn" class="primary" style="background:var(--accent);color:#1A1500;border:none;border-radius:6px;padding:8px 16px;font-weight:700;font-size:13px;cursor:pointer;margin:12px 0;">產生摘要</button>
 
-    <div class="proxy-status" id="summaryStatus"></div>
+      <div class="proxy-status" id="summaryStatus"></div>
 
-    <div class="table-wrap" style="padding:20px;">
-      <pre id="summaryText" style="white-space:pre-wrap;font-family:var(--font-mono);font-size:13px;line-height:1.8;color:var(--text-primary);margin:0;">按「產生摘要」查看盤前/盤後市場整理。</pre>
+      <div class="table-wrap" style="padding:20px;">
+        <pre id="summaryText" style="white-space:pre-wrap;font-family:var(--font-mono);font-size:13px;line-height:1.8;color:var(--text-primary);margin:0;">按「產生摘要」查看盤前/盤後市場整理。</pre>
+      </div>
+    </div>
+
+    <div id="holdingsDigestView" style="display:none;">
+      <div style="font-size:12px;color:var(--text-tertiary);margin:12px 0;">整理你「個人存股表現」裡目前的持股，需要先登入帳號並至少有一筆持股。</div>
+      <button id="digestRefreshBtn" class="primary" style="background:var(--accent);color:#1A1500;border:none;border-radius:6px;padding:8px 16px;font-weight:700;font-size:13px;cursor:pointer;margin-bottom:12px;">產生持股摘要</button>
+
+      <div class="proxy-status" id="digestStatus"></div>
+
+      <div id="digestContainer"></div>
     </div>
   </div>
 
@@ -3126,6 +3138,8 @@ document.getElementById('summaryTabs').addEventListener('click', (e) => {
   if(!btn) return;
   summaryPeriod = btn.dataset.period;
   document.querySelectorAll('#summaryTabs .tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+  document.getElementById('marketSummaryView').style.display = summaryPeriod === 'holdings' ? 'none' : 'block';
+  document.getElementById('holdingsDigestView').style.display = summaryPeriod === 'holdings' ? 'block' : 'none';
 });
 
 function setSummaryStatus(text, kind){
@@ -3160,6 +3174,96 @@ document.getElementById('summaryRefreshBtn').addEventListener('click', async () 
     document.getElementById('summaryText').textContent = '抓取失敗，請重試。';
   }
 });
+
+function setDigestStatus(text, kind){
+  const el = document.getElementById('digestStatus');
+  el.textContent = text;
+  el.className = 'proxy-status' + (kind ? ' ' + kind : '');
+}
+
+document.getElementById('digestRefreshBtn').addEventListener('click', async () => {
+  if(!proxyUrl){
+    setDigestStatus('請先在「個人存股表現」區塊貼上並儲存 GAS proxy 網址。', 'error');
+    return;
+  }
+  if(!currentUsername){
+    setDigestStatus('請先到「個人存股表現」登入帳號。', 'error');
+    return;
+  }
+  if(!holdings || holdings.length === 0){
+    setDigestStatus('目前沒有持股，先到「個人存股表現」新增持股。', 'error');
+    return;
+  }
+
+  setDigestStatus('產生中...（可能需要10-20秒）', '');
+  document.getElementById('digestContainer').innerHTML = '<div class="empty-state">抓取中...</div>';
+
+  try{
+    const codes = [...new Set(holdings.map(h => h.code))];
+    const url = proxyUrl + '?type=holdingsDigest&codes=' + encodeURIComponent(codes.join(','));
+    const data = await fetchViaJsonp(url, 40000);
+
+    if(data.error || !data.list){
+      setDigestStatus('產生失敗：' + (data.error || '查無資料'), 'error');
+      return;
+    }
+
+    renderHoldingsDigest(data.list);
+    const genTime = data.generatedAt ? new Date(data.generatedAt).toLocaleString('zh-Hant-TW', { hour12:false }) : '';
+    setDigestStatus('已產生（' + genTime + '）', 'ok');
+  }catch(err){
+    setDigestStatus('抓取失敗：' + err.message, 'error');
+  }
+});
+
+function renderHoldingsDigest(list){
+  const container = document.getElementById('digestContainer');
+
+  if(!list || list.length === 0){
+    container.innerHTML = '<div class="empty-state">查無資料。</div>';
+    return;
+  }
+
+  container.innerHTML = list.map(item => {
+    const priceCell = item.price != null
+      ? `${fmt(item.price, item.price > 1000 ? 0 : 2)} <span class="${pctColor(item.changePct)}">${arrow(item.changePct)} ${item.changePct > 0 ? '+' : ''}${fmt(item.changePct,2)}%</span>`
+      : '查無報價';
+
+    const instCell = item.instTotal != null
+      ? `<span class="${item.instTotal >= 0 ? 'up-text' : 'down-text'}">${item.instTotal > 0 ? '+' : ''}${(item.instTotal/1000).toLocaleString('zh-Hant-TW',{maximumFractionDigits:0})}張</span>（${item.instDate || ''}）`
+      : '查無資料';
+
+    const revenueCell = item.revenueYoY != null
+      ? `<span class="${pctColor(item.revenueYoY)}">${item.revenueYoY > 0 ? '+' : ''}${fmt(item.revenueYoY,2)}%</span>（${item.revenueMonth || ''}）`
+      : '查無資料';
+
+    const dividendCell = item.exDividendDate
+      ? `<span class="tag">${item.exDividendDate} ${item.exDividendType || ''}</span>`
+      : '近期無';
+
+    const maCell = item.ma5Signal
+      ? `<span class="${item.ma5Signal === 'above' ? 'up-text' : 'down-text'}">${item.ma5Signal === 'above' ? '站上' : '跌破'} MA5（${fmt(item.ma5Value, item.ma5Value > 1000 ? 0 : 2)}）</span>`
+      : '資料累積中';
+
+    return `
+      <div class="table-wrap clickable-row" data-code="${item.code}" style="padding:14px 16px;margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
+          <div><b>${item.name || item.code}</b> <span class="code">${item.code}</span></div>
+          <div style="font-family:var(--font-mono);">${priceCell}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;font-size:12px;color:var(--text-secondary);">
+          <div>法人買賣超：${instCell}</div>
+          <div>月營收年增率：${revenueCell}</div>
+          <div>除權息：${dividendCell}</div>
+          <div>均線訊號：${maCell}</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  container.querySelectorAll('.clickable-row').forEach(el => {
+    el.addEventListener('click', () => jumpToKline(el.dataset.code));
+  });
+}
 
 renderTicker();
 renderIndices();
