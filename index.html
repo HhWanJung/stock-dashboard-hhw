@@ -545,6 +545,7 @@ tbody tr:hover{ background:var(--bg-raised); }
       <button class="nav-item" data-target="individualSection"><span class="nav-num">05</span>個股</button>
       <button class="nav-item" data-target="calendarSection"><span class="nav-num">06</span>台股行事曆</button>
       <button class="nav-item" data-target="strategySection"><span class="nav-num">07</span>策略選股</button>
+      <button class="nav-item" data-target="summarySection"><span class="nav-num">08</span>市場整理</button>
     </nav>
 
     <div class="content-area">
@@ -937,6 +938,32 @@ tbody tr:hover{ background:var(--bg-raised); }
         </thead>
         <tbody id="strategyClosedBody"><tr><td colspan="7"><div class="empty-state">尚無資料。</div></td></tr></tbody>
       </table>
+    </div>
+  </div>
+
+  <div class="section page-section" id="summarySection">
+    <div class="section-head">
+      <span class="section-eyebrow">08</span>
+      <h2>市場整理</h2>
+    </div>
+
+    <div class="demo-banner" style="margin-bottom:1.5rem;">
+      <b>盤前摘要</b>：美股收盤、台指期夜盤、今日除權息股票——建議開盤前（09:00前）看。<br>
+      <b>盤後摘要</b>：加權/櫃買指數、成交量前5名、漲跌幅前3、法人買超/賣超前3——建議收盤後（13:30後）看。<br>
+      內容每 10 分鐘快取一次，短時間內重複按不會重新抓取。
+    </div>
+
+    <div class="tabs" id="summaryTabs">
+      <button class="tab-btn active" data-period="premarket">盤前摘要</button>
+      <button class="tab-btn" data-period="postmarket">盤後摘要</button>
+    </div>
+
+    <button id="summaryRefreshBtn" class="primary" style="background:var(--accent);color:#1A1500;border:none;border-radius:6px;padding:8px 16px;font-weight:700;font-size:13px;cursor:pointer;margin:12px 0;">產生摘要</button>
+
+    <div class="proxy-status" id="summaryStatus"></div>
+
+    <div class="table-wrap" style="padding:20px;">
+      <pre id="summaryText" style="white-space:pre-wrap;font-family:var(--font-mono);font-size:13px;line-height:1.8;color:var(--text-primary);margin:0;">按「產生摘要」查看盤前/盤後市場整理。</pre>
     </div>
   </div>
 
@@ -3089,6 +3116,49 @@ document.getElementById('strategyClosedBody').addEventListener('click', (e) => {
   const row = e.target.closest('.clickable-row');
   if(!row) return;
   jumpToKline(row.dataset.code);
+});
+
+// ---------- 市場整理 ----------
+let summaryPeriod = 'premarket';
+
+document.getElementById('summaryTabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('.tab-btn');
+  if(!btn) return;
+  summaryPeriod = btn.dataset.period;
+  document.querySelectorAll('#summaryTabs .tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+});
+
+function setSummaryStatus(text, kind){
+  const el = document.getElementById('summaryStatus');
+  el.textContent = text;
+  el.className = 'proxy-status' + (kind ? ' ' + kind : '');
+}
+
+document.getElementById('summaryRefreshBtn').addEventListener('click', async () => {
+  if(!proxyUrl){
+    setSummaryStatus('請先在「個人存股表現」區塊貼上並儲存 GAS proxy 網址。', 'error');
+    return;
+  }
+
+  setSummaryStatus('產生中...（要抓好幾種資料，可能需要10-20秒）', '');
+  document.getElementById('summaryText').textContent = '抓取中...';
+
+  try{
+    const url = proxyUrl + '?type=marketSummary&period=' + summaryPeriod;
+    const data = await fetchViaJsonp(url, 40000);
+
+    if(data.error || !data.text){
+      setSummaryStatus('產生失敗：' + (data.error || '查無資料'), 'error');
+      return;
+    }
+
+    document.getElementById('summaryText').textContent = data.text;
+    const genTime = data.generatedAt ? new Date(data.generatedAt).toLocaleString('zh-Hant-TW', { hour12:false }) : '';
+    setSummaryStatus('已產生（' + genTime + '）', 'ok');
+  }catch(err){
+    setSummaryStatus('抓取失敗：' + err.message, 'error');
+    document.getElementById('summaryText').textContent = '抓取失敗，請重試。';
+  }
 });
 
 renderTicker();
