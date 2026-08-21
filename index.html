@@ -86,6 +86,9 @@ body{
 .page-section{ display:none; }
 .page-section.active{ display:block; }
 
+.stock-subpanel{ display:none; }
+.stock-subpanel.active{ display:block; }
+
 @media (max-width: 760px){
   .app-layout{ flex-direction:column; }
   .sidebar{
@@ -539,10 +542,9 @@ tbody tr:hover{ background:var(--bg-raised); }
       <button class="nav-item" data-target="section-trending"><span class="nav-num">02</span>話題個股表現</button>
       <button class="nav-item" data-target="section-holdings"><span class="nav-num">03</span>個人存股表現</button>
       <button class="nav-item" data-target="section-watchlist"><span class="nav-num">04</span>關注股票</button>
-      <button class="nav-item" data-target="klineSection"><span class="nav-num">05</span>K線圖</button>
-      <button class="nav-item" data-target="institutionalSection"><span class="nav-num">06</span>法人籌碼＋大戶狀況</button>
-      <button class="nav-item" data-target="calendarSection"><span class="nav-num">07</span>台股行事曆</button>
-      <button class="nav-item" data-target="strategySection"><span class="nav-num">08</span>策略選股</button>
+      <button class="nav-item" data-target="individualSection"><span class="nav-num">05</span>個股</button>
+      <button class="nav-item" data-target="calendarSection"><span class="nav-num">06</span>台股行事曆</button>
+      <button class="nav-item" data-target="strategySection"><span class="nav-num">07</span>策略選股</button>
     </nav>
 
     <div class="content-area">
@@ -694,128 +696,141 @@ tbody tr:hover{ background:var(--bg-raised); }
     </div>
   </div>
 
-  <div class="section page-section" id="klineSection">
+  <div class="section page-section" id="individualSection">
     <div class="section-head">
       <span class="section-eyebrow">05</span>
-      <h2>K線圖</h2>
+      <h2>個股</h2>
     </div>
 
     <div class="add-form">
-      <input id="klineCodeInput" placeholder="股票代號 例如 2330（僅支援上市股票）" maxlength="6">
-      <button id="klineBtn" class="primary">查詢K線</button>
+      <input id="stockCodeInput" placeholder="股票代號 例如 2330（僅支援上市股票）" maxlength="6">
+      <button id="stockQueryBtn" class="primary">查詢個股</button>
     </div>
 
-    <div class="tabs" id="klinePeriodTabs">
-      <button class="tab-btn" data-months="3">3個月</button>
-      <button class="tab-btn active" data-months="6">6個月</button>
-      <button class="tab-btn" data-months="12">1年</button>
-      <button class="tab-btn" data-months="24">2年</button>
+    <div class="proxy-status" id="stockQueryStatus"></div>
+
+    <div class="tabs" id="stockSubTabs">
+      <button class="tab-btn active" data-subtab="quote">報價概況</button>
+      <button class="tab-btn" data-subtab="kline">K線</button>
+      <button class="tab-btn" data-subtab="institutional">法人進出</button>
+      <button class="tab-btn" data-subtab="margin">融資融券</button>
+      <button class="tab-btn" data-subtab="holders">大戶</button>
+      <button class="tab-btn" data-subtab="revenue">營收</button>
+      <button class="tab-btn" data-subtab="basic">基本資料</button>
+      <button class="tab-btn" data-subtab="dividends">除權息</button>
     </div>
 
-    <div class="tabs" id="klineTypeTabs">
-      <button class="tab-btn active" data-type="day">日K</button>
-      <button class="tab-btn" data-type="week">週K</button>
-      <button class="tab-btn" data-type="month">月K</button>
+    <div class="stock-subpanel active" id="subpanel-quote">
+      <div id="quoteOverviewPanel"><div class="empty-state">輸入股票代號查詢報價概況。</div></div>
     </div>
 
-    <div class="tabs" id="klineMaTabs">
-      <button class="tab-btn ma-toggle active" data-ma="5" style="border-color:#5EC8D8;color:#5EC8D8;">MA5</button>
-      <button class="tab-btn ma-toggle active" data-ma="10" style="border-color:#C9A227;color:#C9A227;">MA10</button>
-      <button class="tab-btn ma-toggle" data-ma="30" style="border-color:#B57EDC;color:#B57EDC;">MA30</button>
-      <button class="tab-btn ma-toggle" data-ma="60" style="border-color:#E8965A;color:#E8965A;">MA60</button>
+    <div class="stock-subpanel" id="subpanel-kline">
+      <div class="tabs" id="klinePeriodTabs">
+        <button class="tab-btn" data-months="3">3個月</button>
+        <button class="tab-btn active" data-months="6">6個月</button>
+        <button class="tab-btn" data-months="12">1年</button>
+        <button class="tab-btn" data-months="24">2年</button>
+      </div>
+
+      <div class="tabs" id="klineTypeTabs">
+        <button class="tab-btn active" data-type="day">日K</button>
+        <button class="tab-btn" data-type="week">週K</button>
+        <button class="tab-btn" data-type="month">月K</button>
+      </div>
+
+      <div class="tabs" id="klineMaTabs">
+        <button class="tab-btn ma-toggle active" data-ma="5" style="border-color:#5EC8D8;color:#5EC8D8;">MA5</button>
+        <button class="tab-btn ma-toggle active" data-ma="10" style="border-color:#C9A227;color:#C9A227;">MA10</button>
+        <button class="tab-btn ma-toggle" data-ma="30" style="border-color:#B57EDC;color:#B57EDC;">MA30</button>
+        <button class="tab-btn ma-toggle" data-ma="60" style="border-color:#E8965A;color:#E8965A;">MA60</button>
+      </div>
+
+      <div class="tabs" id="klineIndicatorTabs">
+        <button class="tab-btn" data-indicator="none">不顯示副圖</button>
+        <button class="tab-btn active" data-indicator="kd">KD</button>
+        <button class="tab-btn" data-indicator="macd">MACD</button>
+        <button class="tab-btn" data-indicator="rsi">RSI</button>
+      </div>
+
+      <div class="proxy-status" id="klineStatus"></div>
+
+      <div id="klineMaPanel" style="margin-bottom:12px;"></div>
+
+      <div class="table-wrap" style="padding:16px;overflow-x:auto;">
+        <div id="klineChartContainer"><div class="empty-state">輸入股票代號查詢K線圖。</div></div>
+      </div>
     </div>
 
-    <div class="tabs" id="klineIndicatorTabs">
-      <button class="tab-btn" data-indicator="none">不顯示副圖</button>
-      <button class="tab-btn active" data-indicator="kd">KD</button>
-      <button class="tab-btn" data-indicator="macd">MACD</button>
-      <button class="tab-btn" data-indicator="rsi">RSI</button>
+    <div class="stock-subpanel" id="subpanel-institutional">
+      <div class="proxy-status" id="instStatus"></div>
+
+      <div class="table-wrap" style="padding:16px;overflow-x:auto;margin-bottom:16px;">
+        <div id="instChartContainer"><div class="empty-state">查詢後會顯示三大法人買賣超圖表。</div></div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>日期</th>
+              <th class="num">外資</th>
+              <th class="num">投信</th>
+              <th class="num">自營商</th>
+              <th class="num">合計</th>
+            </tr>
+          </thead>
+          <tbody id="instBody"><tr><td colspan="5"><div class="empty-state">輸入股票代號查詢近30日三大法人買賣超。</div></td></tr></tbody>
+        </table>
+      </div>
     </div>
 
-    <div class="proxy-status" id="klineStatus"></div>
-    <div style="margin-bottom:12px;">
-      <button id="jumpToInstBtn" class="tab-btn">查看這支股票的法人籌碼 →</button>
+    <div class="stock-subpanel" id="subpanel-margin">
+      <div class="table-wrap" style="padding:16px;overflow-x:auto;margin-bottom:16px;">
+        <div id="marginChartContainer"><div class="empty-state">查詢後顯示融資融券變化圖。</div></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>日期</th>
+              <th class="num">融資買進</th>
+              <th class="num">融資賣出</th>
+              <th class="num">融資餘額</th>
+              <th class="num">融券買進</th>
+              <th class="num">融券賣出</th>
+              <th class="num">融券餘額</th>
+            </tr>
+          </thead>
+          <tbody id="marginBody"><tr><td colspan="7"><div class="empty-state">輸入股票代號查詢融資融券。</div></td></tr></tbody>
+        </table>
+      </div>
     </div>
 
-    <div id="klineMaPanel" style="margin-bottom:12px;"></div>
-
-    <div class="table-wrap" style="padding:16px;overflow-x:auto;">
-      <div id="klineChartContainer"><div class="empty-state">輸入股票代號查詢K線圖。</div></div>
-    </div>
-  </div>
-
-  <div class="section page-section" id="institutionalSection">
-    <div class="section-head">
-      <span class="section-eyebrow">06</span>
-      <h2>法人籌碼＋大戶狀況</h2>
+    <div class="stock-subpanel" id="subpanel-holders">
+      <div id="foreignHoldingPanel" style="margin-bottom:16px;"></div>
+      <div id="instHolderPanel"></div>
     </div>
 
-    <div class="add-form">
-      <input id="instCodeInput" placeholder="股票代號 例如 2330（僅支援上市股票）" maxlength="6">
-      <button id="instBtn" class="primary">查詢籌碼</button>
+    <div class="stock-subpanel" id="subpanel-revenue">
+      <div class="table-wrap" style="overflow-x:auto;">
+        <div id="revenueContainer"><div class="empty-state">查詢後顯示近12個月營收。</div></div>
+      </div>
     </div>
 
-    <div class="proxy-status" id="instStatus"></div>
-
-    <div id="instHolderPanel" style="margin-bottom:16px;"></div>
-
-    <div class="table-wrap" style="padding:16px;overflow-x:auto;margin-bottom:16px;">
-      <div id="instChartContainer"><div class="empty-state">查詢後會顯示三大法人買賣超圖表。</div></div>
+    <div class="stock-subpanel" id="subpanel-basic">
+      <div id="basicInfoPanel" class="table-wrap" style="padding:14px 16px;"><div class="empty-state">查詢股票代號後顯示基本資料。</div></div>
     </div>
 
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>日期</th>
-            <th class="num">外資</th>
-            <th class="num">投信</th>
-            <th class="num">自營商</th>
-            <th class="num">合計</th>
-          </tr>
-        </thead>
-        <tbody id="instBody"><tr><td colspan="5"><div class="empty-state">輸入股票代號查詢近10日三大法人買賣超。</div></td></tr></tbody>
-      </table>
-    </div>
-
-    <div style="margin:20px 0 10px;font-size:13px;font-weight:700;color:var(--accent);">基本資料 ＋ 外資持股比率</div>
-    <div id="basicInfoPanel" class="table-wrap" style="padding:14px 16px;"><div class="empty-state">查詢股票代號後顯示基本資料。</div></div>
-
-    <div style="margin:20px 0 10px;font-size:13px;font-weight:700;color:var(--accent);">融資融券（近10個交易日）</div>
-    <div class="table-wrap" style="padding:16px;overflow-x:auto;margin-bottom:16px;">
-      <div id="marginChartContainer"><div class="empty-state">查詢後顯示融資融券變化圖。</div></div>
-    </div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>日期</th>
-            <th class="num">融資買進</th>
-            <th class="num">融資賣出</th>
-            <th class="num">融資餘額</th>
-            <th class="num">融券買進</th>
-            <th class="num">融券賣出</th>
-            <th class="num">融券餘額</th>
-          </tr>
-        </thead>
-        <tbody id="marginBody"><tr><td colspan="7"><div class="empty-state">輸入股票代號查詢融資融券。</div></td></tr></tbody>
-      </table>
-    </div>
-
-    <div style="margin:20px 0 10px;font-size:13px;font-weight:700;color:var(--accent);">除權息（股利分派情形）</div>
-    <div class="table-wrap" style="overflow-x:auto;">
-      <div id="dividendsContainer"><div class="empty-state">查詢後顯示股利分派紀錄。</div></div>
-    </div>
-
-    <div style="margin:20px 0 10px;font-size:13px;font-weight:700;color:var(--accent);">月營收</div>
-    <div class="table-wrap" style="overflow-x:auto;">
-      <div id="revenueContainer"><div class="empty-state">查詢後顯示近12個月營收。</div></div>
+    <div class="stock-subpanel" id="subpanel-dividends">
+      <div class="table-wrap" style="overflow-x:auto;">
+        <div id="dividendsContainer"><div class="empty-state">查詢後顯示股利分派紀錄。</div></div>
+      </div>
     </div>
   </div>
 
   <div class="section page-section" id="calendarSection">
     <div class="section-head">
-      <span class="section-eyebrow">07</span>
+      <span class="section-eyebrow">06</span>
       <h2>台股行事曆 － 除權息</h2>
     </div>
 
@@ -867,7 +882,7 @@ tbody tr:hover{ background:var(--bg-raised); }
 
   <div class="section page-section" id="strategySection">
     <div class="section-head">
-      <span class="section-eyebrow">08</span>
+      <span class="section-eyebrow">07</span>
       <h2>策略選股</h2>
     </div>
 
@@ -1124,20 +1139,36 @@ document.getElementById('sidebarNav').addEventListener('click', (e) => {
 });
 
 function jumpToKline(code){
-  document.getElementById('klineCodeInput').value = code;
-  klineCurrentCode = code;
-  fetchKline(code);
-  switchTab('klineSection');
+  switchTab('individualSection');
+  switchStockSubtab('kline');
+  queryStock(code);
 }
 
-document.getElementById('jumpToInstBtn').addEventListener('click', () => {
-  if(!klineCurrentCode){
-    alert('請先查詢一支股票的K線。');
-    return;
-  }
-  fetchInstitutional(klineCurrentCode);
-  switchTab('institutionalSection');
+function switchStockSubtab(target){
+  document.querySelectorAll('#stockSubTabs .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.subtab === target));
+  document.querySelectorAll('.stock-subpanel').forEach(p => p.classList.toggle('active', p.id === 'subpanel-' + target));
+}
+
+document.getElementById('stockSubTabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('.tab-btn');
+  if(!btn) return;
+  switchStockSubtab(btn.dataset.subtab);
 });
+
+document.getElementById('stockQueryBtn').addEventListener('click', () => {
+  const code = document.getElementById('stockCodeInput').value.trim();
+  if(!code) return;
+  queryStock(code);
+});
+
+function queryStock(code){
+  document.getElementById('stockCodeInput').value = code;
+  klineCurrentCode = code;
+  fetchQuoteOverview(code);
+  fetchKline(code);
+  fetchInstitutional(code);
+  fetchFundamental(code);
+}
 
 // ---------- 帳號系統 ----------
 async function hashPassword(username, password){
@@ -1956,13 +1987,6 @@ function calcRSI(data, period){
   return result;
 }
 
-document.getElementById('klineBtn').addEventListener('click', () => {
-  const code = document.getElementById('klineCodeInput').value.trim();
-  if(!code) return;
-  klineCurrentCode = code;
-  fetchKline(code);
-});
-
 async function fetchKline(code){
   if(!proxyUrl){
     setKlineStatus('請先在「個人存股表現」區塊貼上並儲存 GAS proxy 網址。', 'error');
@@ -2281,25 +2305,17 @@ function setInstStatus(text, kind){
   el.className = 'proxy-status' + (kind ? ' ' + kind : '');
 }
 
-document.getElementById('instBtn').addEventListener('click', () => {
-  const code = document.getElementById('instCodeInput').value.trim();
-  if(!code) return;
-  fetchInstitutional(code);
-  fetchFundamental(code);
-});
-
 async function fetchInstitutional(code){
   if(!proxyUrl){
     setInstStatus('請先在「個人存股表現」區塊貼上並儲存 GAS proxy 網址。', 'error');
     return;
   }
 
-  setInstStatus('抓取中...（要查10個交易日+集保大檔案，可能需要20-40秒，請耐心等候）', '');
-  document.getElementById('instCodeInput').value = code;
+  setInstStatus('抓取中...（要查30個交易日+集保大檔案，可能需要30-60秒，請耐心等候）', '');
 
   try{
     const url = proxyUrl + '?type=institutional&code=' + encodeURIComponent(code);
-    const data = await fetchViaJsonp(url, 50000);
+    const data = await fetchViaJsonp(url, 70000);
 
     if(data.error){
       setInstStatus('查詢失敗：' + data.error, 'error');
@@ -2323,12 +2339,14 @@ async function fetchFundamental(code){
   document.getElementById('marginChartContainer').innerHTML = '<div class="empty-state">抓取中...</div>';
   document.getElementById('dividendsContainer').innerHTML = '<div class="empty-state">抓取中...</div>';
   document.getElementById('revenueContainer').innerHTML = '<div class="empty-state">抓取中...</div>';
+  document.getElementById('foreignHoldingPanel').innerHTML = '<div class="empty-state">抓取中...</div>';
 
   try{
     const url = proxyUrl + '?type=fundamental&code=' + encodeURIComponent(code);
     const data = await fetchViaJsonp(url, 100000);
 
-    renderBasicInfo(data.basicInfo, data.foreignHolding);
+    renderBasicInfo(data.basicInfo);
+    renderForeignHolding(data.foreignHolding);
     renderMarginChart(data.margin || []);
     renderMarginTable(data.margin || []);
     renderDividends(data.dividends);
@@ -2338,9 +2356,8 @@ async function fetchFundamental(code){
   }
 }
 
-function renderBasicInfo(basicInfo, foreignHolding){
+function renderBasicInfo(basicInfo){
   const panel = document.getElementById('basicInfoPanel');
-  let html = '';
 
   if(basicInfo && !basicInfo.error){
     const rows = [
@@ -2353,35 +2370,40 @@ function renderBasicInfo(basicInfo, foreignHolding){
       ['實收資本額', basicInfo['實收資本額'] ? Number(basicInfo['實收資本額']).toLocaleString('zh-Hant-TW') : '—'],
       ['網址', basicInfo['網址']]
     ].filter(r => r[1]);
-    html += `<div class="holder-grid">` + rows.map(r => `
+    panel.innerHTML = `<div class="holder-grid">` + rows.map(r => `
       <div class="holder-card" style="padding:10px 14px;">
         <div class="label">${r[0]}</div>
         <div style="font-size:14px;">${r[1]}</div>
       </div>`).join('') + `</div>`;
   }else{
-    html += `<div class="empty-state">基本資料：${basicInfo && basicInfo.error ? basicInfo.error : '查無資料'}</div>`;
+    panel.innerHTML = `<div class="empty-state">基本資料：${basicInfo && basicInfo.error ? basicInfo.error : '查無資料'}</div>`;
+  }
+}
+
+function renderForeignHolding(foreignHolding){
+  const panel = document.getElementById('foreignHoldingPanel');
+
+  if(!foreignHolding || foreignHolding.error){
+    panel.innerHTML = `<div class="empty-state">外資持股比率：${(foreignHolding && foreignHolding.error) || '查無資料'}</div>`;
+    return;
   }
 
-  if(foreignHolding && !foreignHolding.error){
-    html += `
-      <div class="holder-grid" style="margin-top:12px;">
-        <div class="holder-card">
-          <div class="label">外資持股比率</div>
-          <div class="value" style="color:var(--up);">${foreignHolding.foreignHoldRatio.toFixed(2)}%</div>
-          <div class="sub">資料日期：${foreignHolding.date}</div>
-        </div>
-        <div class="holder-card">
-          <div class="label">外資尚可投資比率</div>
-          <div class="value">${foreignHolding.availableRatio.toFixed(2)}%</div>
-        </div>
-        <div class="holder-card">
-          <div class="label">外資持有股數</div>
-          <div class="value">${(foreignHolding.foreignHeldShares / 1000).toLocaleString('zh-Hant-TW', {maximumFractionDigits:0})}<span style="font-size:12px;color:var(--text-tertiary);">張</span></div>
-        </div>
-      </div>`;
-  }
-
-  panel.innerHTML = html || '<div class="empty-state">查無資料。</div>';
+  panel.innerHTML = `
+    <div class="holder-grid">
+      <div class="holder-card">
+        <div class="label">外資持股比率</div>
+        <div class="value" style="color:var(--up);">${foreignHolding.foreignHoldRatio.toFixed(2)}%</div>
+        <div class="sub">資料日期：${foreignHolding.date}</div>
+      </div>
+      <div class="holder-card">
+        <div class="label">外資尚可投資比率</div>
+        <div class="value">${foreignHolding.availableRatio.toFixed(2)}%</div>
+      </div>
+      <div class="holder-card">
+        <div class="label">外資持有股數</div>
+        <div class="value">${(foreignHolding.foreignHeldShares / 1000).toLocaleString('zh-Hant-TW', {maximumFractionDigits:0})}<span style="font-size:12px;color:var(--text-tertiary);">張</span></div>
+      </div>
+    </div>`;
 }
 
 function renderMarginChart(days){
@@ -2517,6 +2539,62 @@ function renderInstitutionalTable(days){
     `<tr><td colspan="5" style="font-size:11px;color:var(--text-tertiary);">單位：張（正值為買超，負值為賣超）</td></tr>`;
 }
 
+// ---------- 報價概況 ----------
+async function fetchQuoteOverview(code){
+  const panel = document.getElementById('quoteOverviewPanel');
+  if(!proxyUrl){
+    panel.innerHTML = '<div class="empty-state">請先在「個人存股表現」區塊貼上並儲存 GAS proxy 網址。</div>';
+    return;
+  }
+  panel.innerHTML = '<div class="empty-state">抓取中...</div>';
+
+  try{
+    const url = proxyUrl + '?codes=' + encodeURIComponent(code);
+    const data = await fetchViaJsonp(url, 20000);
+    const q = data[code];
+
+    if(!q || q.error){
+      panel.innerHTML = `<div class="empty-state">查無資料：${(q && q.error) || '請確認代號是否正確'}</div>`;
+      return;
+    }
+
+    const change = (q.prevClose != null) ? q.price - q.prevClose : null;
+    const changePct = (change != null && q.prevClose) ? change / q.prevClose * 100 : null;
+
+    panel.innerHTML = `
+      <div class="holder-grid">
+        <div class="holder-card">
+          <div class="label">${q.name || code}（${code}）</div>
+          <div class="value" style="font-size:26px;">${fmt(q.price, q.price > 1000 ? 0 : 2)}</div>
+          <div class="sub ${change != null ? pctColor(change) : ''}">${change != null ? arrow(change) + ' ' + fmt(Math.abs(change),2) + ' (' + (changePct > 0 ? '+' : '') + fmt(changePct,2) + '%)' : '—'}</div>
+        </div>
+        <div class="holder-card">
+          <div class="label">開盤</div>
+          <div class="value">${fmt(q.open, q.open > 1000 ? 0 : 2)}</div>
+        </div>
+        <div class="holder-card">
+          <div class="label">最高</div>
+          <div class="value" style="color:var(--up);">${fmt(q.high, q.high > 1000 ? 0 : 2)}</div>
+        </div>
+        <div class="holder-card">
+          <div class="label">最低</div>
+          <div class="value" style="color:var(--down);">${fmt(q.low, q.low > 1000 ? 0 : 2)}</div>
+        </div>
+        <div class="holder-card">
+          <div class="label">昨收</div>
+          <div class="value">${fmt(q.prevClose, q.prevClose > 1000 ? 0 : 2)}</div>
+        </div>
+        <div class="holder-card">
+          <div class="label">成交量</div>
+          <div class="value">${q.volume ? Number(q.volume).toLocaleString('zh-Hant-TW') : '—'}</div>
+        </div>
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:var(--text-tertiary);">更新時間：${q.time || '—'}</div>`;
+  }catch(err){
+    panel.innerHTML = `<div class="empty-state">抓取失敗：${err.message}</div>`;
+  }
+}
+
 function renderInstitutionalChart(days){
   const container = document.getElementById('instChartContainer');
 
@@ -2525,54 +2603,59 @@ function renderInstitutionalChart(days){
     return;
   }
 
-  const w = Math.max(600, days.length * 70);
-  const h = 240;
-  const padLeft = 60, padRight = 14, padTop = 20, padBottom = 30;
-  const plotH = h - padTop - padBottom;
-  const groupW = (w - padLeft - padRight) / days.length;
-
-  const allVals = [];
-  days.forEach(d => { allVals.push(d.foreign / 1000, d.trust / 1000, d.dealer / 1000); });
-  const maxAbs = Math.max(...allVals.map(Math.abs), 1);
-  const zeroY = padTop + plotH / 2;
-
-  function yForVal(v){ return zeroY - (v / maxAbs) * (plotH / 2); }
-
   const series = [
-    { key: 'foreign', color: '#5EC8D8', label: '外資' },
-    { key: 'trust', color: '#C9A227', label: '投信' },
-    { key: 'dealer', color: '#B57EDC', label: '自營商' }
+    { key:'foreign', color:'#5EC8D8', label:'外資' },
+    { key:'trust', color:'#C9A227', label:'投信' },
+    { key:'dealer', color:'#B57EDC', label:'自營商' },
+    { key:'total', color:'#E8965A', label:'三大法人合計' }
   ];
 
-  let bars = '';
-  let xLabels = '';
+  const w = Math.max(600, days.length * 24);
+  const h = 130;
+  const padLeft = 60, padRight = 14, padTop = 16, padBottom = 24;
+  const plotH = h - padTop - padBottom;
+  const barW = (w - padLeft - padRight) / days.length;
 
-  days.forEach((d, i) => {
-    const groupX = padLeft + i * groupW;
-    const barW = Math.max((groupW * 0.7) / 3, 3);
-    const gap = (groupW * 0.3) / 4;
+  function buildMiniChart(key, color, label){
+    const vals = days.map(d => d[key] / 1000);
+    const maxAbs = Math.max(...vals.map(Math.abs), 1);
+    const zeroY = padTop + plotH / 2;
+    const yFor = (v) => zeroY - (v / maxAbs) * (plotH / 2);
 
-    series.forEach((s, si) => {
-      const val = d[s.key] / 1000; // 換算成張
-      const x = groupX + gap + si * (barW + gap * 0.3);
-      const y = yForVal(val);
+    let bars = '';
+    days.forEach((d, i) => {
+      const val = d[key] / 1000;
+      const x = padLeft + i * barW;
+      const cx = x + barW / 2;
+      const y = yFor(val);
       const top = Math.min(y, zeroY);
       const barH = Math.max(Math.abs(y - zeroY), 1);
-      bars += `<rect x="${x}" y="${top}" width="${barW}" height="${barH}" fill="${s.color}" opacity="0.85"/>`;
+      const bodyW = Math.max(barW * 0.7, 1);
+      const barColor = val >= 0 ? 'var(--up)' : 'var(--down)';
+      bars += `<rect x="${cx - bodyW / 2}" y="${top}" width="${bodyW}" height="${barH}" fill="${barColor}" opacity="0.85"/>`;
     });
 
-    xLabels += `<text x="${groupX + groupW / 2}" y="${h - 10}" font-size="10" fill="#8B90A3" font-family="'IBM Plex Mono', monospace" text-anchor="middle">${d.date.slice(5)}</text>`;
-  });
+    const idxs = [0, Math.floor(days.length / 2), days.length - 1];
+    let xLabels = '';
+    idxs.forEach(i => {
+      const x = padLeft + i * barW + barW / 2;
+      xLabels += `<text x="${x}" y="${h - 6}" font-size="9" fill="#5B6072" font-family="'IBM Plex Mono', monospace" text-anchor="middle">${days[i].date.slice(5)}</text>`;
+    });
 
-  const legend = series.map(s => `<span style="color:${s.color};margin-right:12px;">— ${s.label}</span>`).join('');
+    return `
+      <div style="margin-bottom:4px;font-size:12px;font-weight:700;color:${color};">${label}</div>
+      <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block;margin-bottom:10px;">
+        <line x1="${padLeft}" y1="${zeroY}" x2="${w - padRight}" y2="${zeroY}" stroke="#2C303C" stroke-width="1"/>
+        ${bars}
+        ${xLabels}
+      </svg>`;
+  }
+
+  const chartsHtml = series.map(s => buildMiniChart(s.key, s.color, s.label)).join('');
 
   container.innerHTML = `
-    <div style="margin-bottom:8px;font-size:12px;font-family:'IBM Plex Mono', monospace;">${legend}<span style="color:#5B6072;">單位：張</span></div>
-    <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block;">
-      <line x1="${padLeft}" y1="${zeroY}" x2="${w - padRight}" y2="${zeroY}" stroke="#2C303C" stroke-width="1"/>
-      ${bars}
-      ${xLabels}
-    </svg>`;
+    <div style="font-size:11px;color:#5B6072;margin-bottom:8px;">單位：張，紅色為買超、綠色為賣超（近30個交易日）</div>
+    ${chartsHtml}`;
 }
 
 function renderHolderPanel(holders){
