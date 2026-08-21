@@ -636,6 +636,13 @@ tbody tr:hover{ background:var(--bg-raised); }
 
     <div class="totals-row" id="totalsRow"></div>
 
+    <div style="margin:20px 0 10px;font-size:13px;font-weight:700;color:var(--accent);">持股績效走勢</div>
+    <div class="table-wrap" style="padding:16px;overflow-x:auto;margin-bottom:20px;">
+      <button id="portfolioHistoryBtn" class="tab-btn" style="margin-bottom:12px;">查詢績效走勢</button>
+      <div class="proxy-status" id="portfolioHistoryStatus"></div>
+      <div id="portfolioHistoryContainer"><div class="empty-state">每天下午系統會自動記錄一次你的總市值，累積幾天後按上面按鈕查看走勢圖。</div></div>
+    </div>
+
     <div class="table-wrap">
       <table>
         <thead>
@@ -1542,6 +1549,113 @@ async function loadUserDataFromServer(){
   }catch(err){
     console.error('讀取使用者資料失敗', err);
   }
+}
+
+// ---------- 持股績效走勢 ----------
+function setPortfolioHistoryStatus(text, kind){
+  const el = document.getElementById('portfolioHistoryStatus');
+  el.textContent = text;
+  el.className = 'proxy-status' + (kind ? ' ' + kind : '');
+}
+
+document.getElementById('portfolioHistoryBtn').addEventListener('click', async () => {
+  if(!proxyUrl){
+    setPortfolioHistoryStatus('請先貼上並儲存 GAS proxy 網址。', 'error');
+    return;
+  }
+  if(!currentUsername){
+    setPortfolioHistoryStatus('請先登入帳號。', 'error');
+    return;
+  }
+
+  setPortfolioHistoryStatus('查詢中...', '');
+  document.getElementById('portfolioHistoryContainer').innerHTML = '<div class="empty-state">抓取中...</div>';
+
+  try{
+    const url = proxyUrl + '?type=portfolioHistory&username=' + encodeURIComponent(currentUsername) + '&passwordHash=' + currentPasswordHash;
+    const result = await fetchViaJsonp(url, 20000);
+
+    if(!result.ok){
+      setPortfolioHistoryStatus('查詢失敗：' + result.error, 'error');
+      return;
+    }
+
+    renderPortfolioHistory(result.history || []);
+    setPortfolioHistoryStatus('已更新（共 ' + (result.history ? result.history.length : 0) + ' 個交易日資料）', 'ok');
+  }catch(err){
+    setPortfolioHistoryStatus('抓取失敗：' + err.message, 'error');
+  }
+});
+
+function renderPortfolioHistory(history){
+  const container = document.getElementById('portfolioHistoryContainer');
+
+  if(!history || history.length === 0){
+    container.innerHTML = '<div class="empty-state">目前還沒有累積任何績效紀錄，系統每天下午會自動記錄一次，明天再回來看看。</div>';
+    return;
+  }
+  if(history.length < 2){
+    container.innerHTML = '<div class="empty-state">目前只有 ' + history.length + ' 天的資料，至少需要2天才能畫出走勢，明天再回來看看。</div>';
+    return;
+  }
+
+  const w = Math.max(600, history.length * 20);
+  const h = 260;
+  const padLeft = 70, padRight = 14, padTop = 20, padBottom = 30;
+  const plotW = w - padLeft - padRight;
+  const plotH = h - padTop - padBottom;
+
+  const values = history.map(h => h.totalValue);
+  const maxV = Math.max(...values);
+  const minV = Math.min(...values);
+  const range = (maxV - minV) || 1;
+
+  const xFor = (i) => padLeft + (i / (history.length - 1)) * plotW;
+  const yFor = (v) => padTop + (1 - (v - minV) / range) * plotH;
+
+  let gridHtml = '';
+  [minV, (minV + maxV) / 2, maxV].forEach(v => {
+    const y = yFor(v);
+    gridHtml += `<line x1="${padLeft}" y1="${y}" x2="${w - padRight}" y2="${y}" stroke="#2C303C" stroke-width="1"/>`;
+    gridHtml += `<text x="${padLeft - 8}" y="${y + 4}" font-size="10" fill="#8B90A3" font-family="'IBM Plex Mono', monospace" text-anchor="end">${Math.round(v).toLocaleString('zh-Hant-TW')}</text>`;
+  });
+
+  const idxs = [0, Math.floor(history.length / 2), history.length - 1];
+  let xLabels = '';
+  idxs.forEach(i => {
+    xLabels += `<text x="${xFor(i)}" y="${h - 10}" font-size="10" fill="#8B90A3" font-family="'IBM Plex Mono', monospace" text-anchor="middle">${history[i].date.slice(5)}</text>`;
+  });
+
+  const firstValue = history[0].totalValue;
+  const lastValue = history[history.length - 1].totalValue;
+  const overallChangePct = firstValue > 0 ? (lastValue - firstValue) / firstValue * 100 : 0;
+  const lineColor = overallChangePct >= 0 ? 'var(--up)' : 'var(--down)';
+
+  const pts = history.map((h, i) => xFor(i) + ',' + yFor(h.totalValue)).join(' ');
+
+  const latest = history[history.length - 1];
+
+  container.innerHTML = `
+    <div class="holder-grid" style="margin-bottom:14px;">
+      <div class="holder-card">
+        <div class="label">目前總市值</div>
+        <div class="value">${Math.round(latest.totalValue).toLocaleString('zh-Hant-TW')}</div>
+      </div>
+      <div class="holder-card">
+        <div class="label">目前總報酬率</div>
+        <div class="value ${pctColor(latest.pnlPct)}">${latest.pnlPct > 0 ? '+' : ''}${fmt(latest.pnlPct,2)}%</div>
+      </div>
+      <div class="holder-card">
+        <div class="label">期間市值變化（${history[0].date} 至今）</div>
+        <div class="value ${pctColor(overallChangePct)}">${overallChangePct > 0 ? '+' : ''}${fmt(overallChangePct,2)}%</div>
+      </div>
+    </div>
+    <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block;">
+      ${gridHtml}
+      <polyline points="${pts}" fill="none" stroke="${lineColor}" stroke-width="2"/>
+      ${xLabels}
+    </svg>
+    <div style="margin-top:6px;font-size:11px;color:var(--text-tertiary);">縱軸為總市值（依當時持股股數×當天收盤價計算），每天下午自動記錄一次。</div>`;
 }
 
 let holdings = [];
