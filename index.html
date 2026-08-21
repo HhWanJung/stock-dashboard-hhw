@@ -913,7 +913,8 @@ tbody tr:hover{ background:var(--bg-raised); }
 
     <div class="demo-banner" style="margin-bottom:1.5rem;">
       <b>出場規則（固定）</b>：進場後最多持有3個交易日，若期間跌破「進場當天的5日均線」提前停損，撐滿3天則不論盈虧出場。<br>
-      <b>資料限制</b>：這是每天累積一次的市場快照，需要累積滿 <b>5個交易日</b> 資料才會開始篩選；法人連續買超條件另外累積法人快照。<br>
+      <b>新增參考欄位</b>：<b>停損</b>（近20日箱底下方3%）、<b>壓力價</b>（近20日最高點，括號是距離現價還有幾%）、<b>RS</b>（相對大盤過去20日的超額報酬，正值代表跑贏大盤）。<br>
+      <b>資料限制</b>：這是每天累積一次的市場快照，需要累積滿 <b>5個交易日</b> 資料才會開始篩選；法人連續買超、KD黃金交叉需要更多天數（KD至少9天）才會生效。<br>
       <b>⚠️ 全站共用</b>：下面的篩選條件是所有登入者共用的設定，不分帳號各自設定。
     </div>
 
@@ -931,18 +932,20 @@ tbody tr:hover{ background:var(--bg-raised); }
     <div id="strategyProgressPanel" style="margin-bottom:20px;"></div>
 
     <div style="margin:0 0 10px;font-size:13px;font-weight:700;color:var(--accent);">目前持有中（進場後尚未出場）</div>
-    <div class="table-wrap" style="margin-bottom:20px;">
+    <div class="table-wrap" style="margin-bottom:20px;overflow-x:auto;">
       <table>
         <thead>
           <tr>
             <th>股票</th>
             <th>進場日</th>
             <th class="num">進場價</th>
-            <th class="num">進場均線</th>
+            <th class="num">停損</th>
+            <th class="num">壓力價(距%)</th>
+            <th class="num">RS</th>
             <th class="num">持有天數</th>
           </tr>
         </thead>
-        <tbody id="strategyOpenBody"><tr><td colspan="5"><div class="empty-state">尚無資料。</div></td></tr></tbody>
+        <tbody id="strategyOpenBody"><tr><td colspan="7"><div class="empty-state">尚無資料。</div></td></tr></tbody>
       </table>
     </div>
 
@@ -3283,18 +3286,29 @@ function renderStrategyProgress(daysCollected, instDaysCollected){
 function renderStrategyOpen(positions){
   const body = document.getElementById('strategyOpenBody');
   if(!positions || positions.length === 0){
-    body.innerHTML = `<tr><td colspan="5"><div class="empty-state">目前沒有持有中的部位。</div></td></tr>`;
+    body.innerHTML = `<tr><td colspan="7"><div class="empty-state">目前沒有持有中的部位。</div></td></tr>`;
     return;
   }
 
-  body.innerHTML = positions.map(p => `
+  body.innerHTML = positions.map(p => {
+    const resistanceCell = (p.resistancePrice != null && p.resistancePct != null)
+      ? `${fmt(p.resistancePrice, p.resistancePrice > 1000 ? 0 : 2)}（+${fmt(p.resistancePct,1)}%）`
+      : '—';
+    const rsCell = p.rs != null
+      ? `<span class="${pctColor(p.rs)}">${p.rs > 0 ? '+' : ''}${fmt(p.rs,1)}</span>`
+      : '—';
+
+    return `
     <tr class="clickable-row" data-code="${p.code}">
       <td><div>${p.name}</div><div class="code">${p.code}</div></td>
       <td>${p.entryDate}</td>
       <td class="num">${fmt(p.entryPrice, p.entryPrice > 1000 ? 0 : 2)}</td>
-      <td class="num">${fmt(p.entryMA5, p.entryMA5 > 1000 ? 0 : 2)}</td>
+      <td class="num down-text">${p.stopLoss != null ? fmt(p.stopLoss, p.stopLoss > 1000 ? 0 : 2) : fmt(p.entryMA5, p.entryMA5 > 1000 ? 0 : 2)}</td>
+      <td class="num">${resistanceCell}</td>
+      <td class="num">${rsCell}</td>
       <td class="num">${p.daysHeld} / 3</td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 function renderStrategyClosed(positions){
