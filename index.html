@@ -982,8 +982,8 @@ tbody tr:hover{ background:var(--bg-raised); }
     </div>
 
     <div class="demo-banner" style="margin-bottom:1.5rem;">
-      <b>盤前摘要</b>：美股收盤、台指期夜盤、今日除權息股票——建議開盤前（09:00前）看。<br>
-      <b>盤後摘要</b>：加權/櫃買指數、成交量前5名、漲跌幅前3、法人買超/賣超前3——建議收盤後（13:30後）看。<br>
+      <b>盤前摘要</b>：美股收盤、台指期夜盤、今日除權息股票、財經新聞——建議開盤前（09:00前）看。<br>
+      <b>盤後摘要</b>：加權/櫃買指數、成交量前5名、漲跌幅前3、法人買超/賣超前3、財經新聞——建議收盤後（13:30後）看。<br>
       內容每 10 分鐘快取一次，短時間內重複按不會重新抓取。
     </div>
 
@@ -999,6 +999,23 @@ tbody tr:hover{ background:var(--bg-raised); }
         <button id="testPushPostmarketBtn" class="tab-btn">測試推播盤後摘要</button>
       </div>
       <div class="proxy-status" id="linePushStatus"></div>
+    </div>
+
+    <div class="table-wrap" style="padding:16px;margin-bottom:1.5rem;">
+      <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:8px;">🎙️ Podcast 新集數追蹤</div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;line-height:1.6;">
+        追蹤你指定的 Podcast，每4小時檢查一次有沒有新集數，有的話會用 LINE 通知你（標題+節目自己寫的簡介+連結）。<br>
+        ⚠️ 這是「新集數提醒」，不是「AI幫你聽完整理重點」——沒辦法自動聽懂音檔內容，只能顯示節目自己提供的文字說明。<br>
+        設定步驟：貼上該節目的 RSS Feed 網址（大部分Podcast平台都能找到，通常在節目介紹頁或用 Apple Podcasts 搜尋節目名稱+RSS 就能找到）加入追蹤，
+        再手動執行一次 <code>installPodcastTrigger</code> 建立排程。
+      </div>
+      <div class="add-form">
+        <input id="podcastNameInput" placeholder="節目名稱">
+        <input id="podcastRssInput" placeholder="RSS Feed 網址">
+        <button id="podcastAddBtn">加入追蹤</button>
+      </div>
+      <div class="proxy-status" id="podcastStatus"></div>
+      <div id="podcastList" style="margin-top:10px;"></div>
     </div>
 
     <div class="tabs" id="summaryTabs">
@@ -1230,6 +1247,9 @@ document.getElementById('sidebarNav').addEventListener('click', (e) => {
   switchTab(btn.dataset.target);
   if(btn.dataset.target === 'strategySection' && proxyUrl){
     fetchStrategyStatus();
+  }
+  if(btn.dataset.target === 'summarySection' && proxyUrl){
+    loadPodcastList();
   }
 });
 
@@ -3553,6 +3573,85 @@ async function testLinePush(period){
 
 document.getElementById('testPushPremarketBtn').addEventListener('click', () => testLinePush('premarket'));
 document.getElementById('testPushPostmarketBtn').addEventListener('click', () => testLinePush('postmarket'));
+
+// ---------- Podcast 追蹤管理 ----------
+function setPodcastStatus(text, kind){
+  const el = document.getElementById('podcastStatus');
+  el.textContent = text;
+  el.className = 'proxy-status' + (kind ? ' ' + kind : '');
+}
+
+document.getElementById('podcastAddBtn').addEventListener('click', async () => {
+  if(!proxyUrl){
+    setPodcastStatus('請先在「個人存股表現」區塊貼上並儲存 GAS proxy 網址。', 'error');
+    return;
+  }
+  const name = document.getElementById('podcastNameInput').value.trim();
+  const rssUrl = document.getElementById('podcastRssInput').value.trim();
+  if(!name || !rssUrl){
+    setPodcastStatus('請填寫節目名稱與 RSS 網址。', 'error');
+    return;
+  }
+
+  setPodcastStatus('新增中...', '');
+  try{
+    const url = proxyUrl + '?type=addPodcastFeed&name=' + encodeURIComponent(name) + '&rssUrl=' + encodeURIComponent(rssUrl);
+    const result = await fetchViaJsonp(url, 20000);
+    if(!result.ok){
+      setPodcastStatus('新增失敗：' + result.error, 'error');
+      return;
+    }
+    setPodcastStatus('已加入追蹤：' + name, 'ok');
+    document.getElementById('podcastNameInput').value = '';
+    document.getElementById('podcastRssInput').value = '';
+    loadPodcastList();
+  }catch(err){
+    setPodcastStatus('新增失敗：' + err.message, 'error');
+  }
+});
+
+async function loadPodcastList(){
+  if(!proxyUrl) return;
+  try{
+    const url = proxyUrl + '?type=listPodcastFeeds';
+    const result = await fetchViaJsonp(url, 20000);
+    if(!result.ok) return;
+    renderPodcastList(result.list || []);
+  }catch(err){
+    console.error('讀取Podcast清單失敗', err);
+  }
+}
+
+function renderPodcastList(list){
+  const container = document.getElementById('podcastList');
+  if(!list || list.length === 0){
+    container.innerHTML = '<div class="empty-state">尚未追蹤任何 Podcast。</div>';
+    return;
+  }
+
+  container.innerHTML = list.map(p => `
+    <div class="table-wrap" style="padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div><b>${p.name}</b></div>
+        <div style="font-size:11px;color:var(--text-tertiary);">${p.lastEpisodeTitle ? '最新集數：' + p.lastEpisodeTitle : '尚未偵測到集數'}</div>
+      </div>
+      <button class="del-btn" data-name="${p.name}">刪除</button>
+    </div>`).join('');
+
+  container.querySelectorAll('.del-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const name = btn.dataset.name;
+      if(!confirm(`確定要取消追蹤「${name}」嗎？`)) return;
+      try{
+        const url = proxyUrl + '?type=removePodcastFeed&name=' + encodeURIComponent(name);
+        await fetchViaJsonp(url, 20000);
+        loadPodcastList();
+      }catch(err){
+        alert('刪除失敗：' + err.message);
+      }
+    });
+  });
+}
 
 document.getElementById('digestRefreshBtn').addEventListener('click', async () => {
   if(!proxyUrl){
