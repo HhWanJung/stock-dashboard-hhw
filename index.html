@@ -3055,14 +3055,16 @@ function formatFundamentalValue(key, value){
     const rocYear = parseInt(strVal.slice(0, 3), 10);
     return (rocYear + 1911) + '-' + strVal.slice(3, 5);
   }
-  // 百分比／增減欄位：四捨五入到2位小數
-  if(/[%（(]/.test(key) && !isNaN(parseFloat(strVal)) && strVal.indexOf('.') !== -1){
-    return parseFloat(strVal).toFixed(2) + (key.indexOf('%') !== -1 ? '%' : '');
-  }
-  // 純數字的金額／股數欄位：加千分位
-  if(/^-?\d+(\.\d+)?$/.test(strVal) && strVal.replace('-', '').replace('.', '').length >= 4){
+  // 百分比／增減欄位：統一固定2位小數
+  if(/[%（(]/.test(key) && !isNaN(parseFloat(strVal))){
     const num = parseFloat(strVal);
-    return num.toLocaleString('zh-Hant-TW', { maximumFractionDigits: Number.isInteger(num) ? 0 : 2 });
+    return num.toLocaleString('zh-Hant-TW', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + (key.indexOf('%') !== -1 ? '%' : '');
+  }
+  // 純數字的金額／股數欄位：統一加千分位，有小數固定顯示2位，整數就不顯示小數
+  if(/^-?\d+(\.\d+)?$/.test(strVal)){
+    const num = parseFloat(strVal);
+    const hasDecimal = strVal.indexOf('.') !== -1 && !Number.isInteger(num);
+    return num.toLocaleString('zh-Hant-TW', hasDecimal ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : { maximumFractionDigits: 0 });
   }
   return strVal;
 }
@@ -3141,7 +3143,7 @@ function renderEps(eps){
   }
 
   const keys = Object.keys(eps[0]);
-  const epsKey = keys.find(k => k.indexOf('每股盈餘') !== -1);
+  const epsKey = keys.find(k => k.indexOf('基本每股盈餘') !== -1) || keys.find(k => k.indexOf('每股盈餘') !== -1);
   const revenueKey = keys.find(k => k.indexOf('營業收入') !== -1 && k.indexOf('率') === -1 && k.indexOf('%') === -1);
   const netIncomeKey = keys.find(k => (k.indexOf('本期淨利') !== -1 || (k.indexOf('淨利') !== -1 && k.indexOf('率') === -1)));
 
@@ -3172,14 +3174,14 @@ function renderEps(eps){
     }
 
     const statCards = [];
-    if(!isNaN(epsVal)){
-      statCards.push(`<div><div style="font-size:11px;color:var(--text-tertiary);">每股盈餘(EPS)</div><div style="font-family:var(--font-mono);font-size:20px;font-weight:700;color:${epsVal >= 0 ? 'var(--up)' : 'var(--down)'};">${epsVal.toFixed(2)}</div></div>`);
+    if(!isNaN(epsVal) && Math.abs(epsVal) < 1000){ // 加個合理範圍檢查，避免抓到不是EPS的欄位卻拿來顯示
+      statCards.push(`<div><div style="font-size:11px;color:var(--text-tertiary);">每股盈餘(EPS)</div><div style="font-family:var(--font-mono);font-size:20px;font-weight:700;color:${epsVal >= 0 ? 'var(--up)' : 'var(--down)'};">${epsVal.toLocaleString('zh-Hant-TW',{minimumFractionDigits:2,maximumFractionDigits:2})}</div></div>`);
     }
     if(!isNaN(revenueVal)){
-      statCards.push(`<div><div style="font-size:11px;color:var(--text-tertiary);">營業收入(千元)</div><div style="font-family:var(--font-mono);font-size:14px;">${revenueVal.toLocaleString('zh-Hant-TW')}</div></div>`);
+      statCards.push(`<div><div style="font-size:11px;color:var(--text-tertiary);">營業收入(千元)</div><div style="font-family:var(--font-mono);font-size:14px;">${revenueVal.toLocaleString('zh-Hant-TW',{maximumFractionDigits:0})}</div></div>`);
     }
     if(!isNaN(netIncomeVal)){
-      statCards.push(`<div><div style="font-size:11px;color:var(--text-tertiary);">本期淨利(千元)</div><div style="font-family:var(--font-mono);font-size:14px;color:${netIncomeVal >= 0 ? 'var(--up)' : 'var(--down)'};">${netIncomeVal.toLocaleString('zh-Hant-TW')}</div></div>`);
+      statCards.push(`<div><div style="font-size:11px;color:var(--text-tertiary);">本期淨利(千元)</div><div style="font-family:var(--font-mono);font-size:14px;color:${netIncomeVal >= 0 ? 'var(--up)' : 'var(--down)'};">${netIncomeVal.toLocaleString('zh-Hant-TW',{maximumFractionDigits:0})}</div></div>`);
     }
 
     return `
