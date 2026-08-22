@@ -491,6 +491,63 @@ tbody tr:hover{ background:var(--bg-raised); }
   .cal-chip{ display:none; }
 }
 
+#stockHeaderBar{
+  background:var(--bg-surface);
+  border:1px solid var(--hairline);
+  border-radius:10px;
+  padding:14px 18px;
+  margin-bottom:14px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:12px;
+  position:sticky;
+  top:8px;
+  z-index:5;
+}
+.stock-header-left{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.stock-header-name{ font-size:18px; font-weight:900; }
+.stock-header-code{
+  font-family:var(--font-mono);
+  font-size:12px;
+  color:var(--text-tertiary);
+  background:var(--bg-raised);
+  padding:2px 8px;
+  border-radius:5px;
+}
+.stock-header-industry{
+  font-size:11px;
+  color:var(--accent);
+  background:rgba(201,162,39,0.12);
+  padding:2px 8px;
+  border-radius:5px;
+}
+.stock-header-price{
+  font-family:var(--font-mono);
+  font-size:22px;
+  font-weight:700;
+}
+.stock-header-change{
+  font-family:var(--font-mono);
+  font-size:13px;
+  font-weight:600;
+}
+.growth-badge{
+  font-family:var(--font-mono);
+  font-size:12px;
+  font-weight:700;
+  padding:3px 10px;
+  border-radius:6px;
+  background:var(--bg-raised);
+  white-space:nowrap;
+}
+
 .holder-grid{
   display:grid;
   grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
@@ -729,6 +786,8 @@ tbody tr:hover{ background:var(--bg-raised); }
     </div>
 
     <div class="proxy-status" id="stockQueryStatus"></div>
+
+    <div id="stockHeaderBar" style="display:none;"></div>
 
     <div class="tabs" id="stockSubTabs">
       <button class="tab-btn active" data-subtab="quote">報價概況</button>
@@ -2840,10 +2899,40 @@ async function fetchFundamental(code){
   }
 }
 
+// ---------- 個股頁面頂部固定顯示列（不論切到哪個頁籤都會顯示）----------
+function renderStockHeader(code, name, price, changePct){
+  const bar = document.getElementById('stockHeaderBar');
+  bar.style.display = 'flex';
+  bar.dataset.code = code;
+
+  const hasChange = changePct !== null && changePct !== undefined && !isNaN(changePct);
+  const color = hasChange ? pctColor(changePct) : '';
+
+  bar.innerHTML = `
+    <div class="stock-header-left">
+      <span class="stock-header-name">${name || code}</span>
+      <span class="stock-header-code">${code}</span>
+      <span class="stock-header-industry" id="stockHeaderIndustry" style="display:none;"></span>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:10px;">
+      <span class="stock-header-price">${price != null ? fmt(price, price > 1000 ? 0 : 2) : '—'}</span>
+      ${hasChange ? `<span class="stock-header-change ${color}">${arrow(changePct)} ${changePct > 0 ? '+' : ''}${fmt(changePct,2)}%</span>` : ''}
+    </div>`;
+}
+
+function updateStockHeaderIndustry(industry){
+  const el = document.getElementById('stockHeaderIndustry');
+  if(!el || !industry) return;
+  el.textContent = industry;
+  el.style.display = 'inline-block';
+}
+
 function renderBasicInfo(basicInfo){
   const panel = document.getElementById('basicInfoPanel');
 
   if(basicInfo && !basicInfo.error){
+    updateStockHeaderIndustry(basicInfo['產業別']);
+
     const rows = [
       ['公司名稱', basicInfo['公司名稱']],
       ['產業別', basicInfo['產業別']],
@@ -2995,12 +3084,121 @@ function renderDividends(dividends){
   renderGenericTable(document.getElementById('dividendsContainer'), dividends, '查無股利分派資料。');
 }
 
+// 把 "11507" 這種5位數民國年月字串轉成 "2026-07"
+function formatRocYearMonth(s){
+  s = String(s);
+  if(!/^\d{5}$/.test(s)) return s;
+  const rocYear = parseInt(s.slice(0, 3), 10);
+  return (rocYear + 1911) + '-' + s.slice(3, 5);
+}
+
+// 把 "1150807" 這種7位數民國年日期字串轉成 "2026-08-07"
+function formatRocDate(s){
+  s = String(s);
+  if(!/^\d{7}$/.test(s)) return s;
+  const rocYear = parseInt(s.slice(0, 3), 10);
+  return (rocYear + 1911) + '-' + s.slice(3, 5) + '-' + s.slice(5, 7);
+}
+
 function renderRevenue(revenue){
-  renderGenericTable(document.getElementById('revenueContainer'), revenue, '查無月營收資料。');
+  const container = document.getElementById('revenueContainer');
+  if(!revenue || revenue.error || revenue.length === 0){
+    container.innerHTML = `<div class="empty-state">${(revenue && revenue.error) || '查無月營收資料。'}</div>`;
+    return;
+  }
+
+  container.innerHTML = revenue.map(r => {
+    const monthLabel = formatRocYearMonth(r['資料年月']);
+    const currentRevenue = parseFloat(r['營業收入-當月營收']);
+    const yoyPct = parseFloat(r['營業收入-去年同月增減(%)']);
+    const momPct = parseFloat(r['營業收入-上月比較增減(%)']);
+
+    const revenueYi = !isNaN(currentRevenue) ? (currentRevenue / 100000) : null; // 千元 -> 億元
+
+    const yoyBadge = !isNaN(yoyPct)
+      ? `<span class="growth-badge ${yoyPct >= 0 ? 'up-text' : 'down-text'}">YoY ${yoyPct > 0 ? '+' : ''}${yoyPct.toFixed(1)}%</span>`
+      : '';
+    const momBadge = !isNaN(momPct)
+      ? `<span class="growth-badge ${momPct >= 0 ? 'up-text' : 'down-text'}">MoM ${momPct > 0 ? '+' : ''}${momPct.toFixed(1)}%</span>`
+      : '';
+
+    return `
+      <div class="table-wrap" style="padding:12px 16px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <div>
+          <div style="font-size:12px;color:var(--text-secondary);">${monthLabel}</div>
+          <div style="font-family:var(--font-mono);font-size:19px;font-weight:700;">${revenueYi !== null ? revenueYi.toLocaleString('zh-Hant-TW',{maximumFractionDigits:2}) + ' 億' : '—'}</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">${yoyBadge}${momBadge}</div>
+      </div>`;
+  }).join('');
 }
 
 function renderEps(eps){
-  renderGenericTable(document.getElementById('epsContainer'), eps, '查無財報資料。');
+  const container = document.getElementById('epsContainer');
+  if(!eps || eps.error || !Array.isArray(eps) || eps.length === 0){
+    container.innerHTML = `<div class="empty-state">${(eps && eps.error) || '查無財報資料。'}</div>`;
+    return;
+  }
+
+  const keys = Object.keys(eps[0]);
+  const epsKey = keys.find(k => k.indexOf('每股盈餘') !== -1);
+  const revenueKey = keys.find(k => k.indexOf('營業收入') !== -1 && k.indexOf('率') === -1 && k.indexOf('%') === -1);
+  const netIncomeKey = keys.find(k => (k.indexOf('本期淨利') !== -1 || (k.indexOf('淨利') !== -1 && k.indexOf('率') === -1)));
+
+  // 依出表日期新到舊排序
+  const sorted = eps.slice().sort((a, b) => String(b['出表日期'] || '').localeCompare(String(a['出表日期'] || '')));
+
+  container.innerHTML = sorted.map((row, i) => {
+    const period = row['出表日期'] ? formatRocDate(row['出表日期']) : '—';
+    const epsVal = epsKey ? parseFloat(row[epsKey]) : NaN;
+    const revenueVal = revenueKey ? parseFloat(row[revenueKey]) : NaN;
+    const netIncomeVal = netIncomeKey ? parseFloat(row[netIncomeKey]) : NaN;
+
+    // 跟上一筆（較早的季度）比較，標示季增率或轉盈虧
+    let growthBadge = '';
+    const prevRow = sorted[i + 1];
+    if(netIncomeKey && prevRow){
+      const prevNetIncome = parseFloat(prevRow[netIncomeKey]);
+      if(!isNaN(netIncomeVal) && !isNaN(prevNetIncome)){
+        if(prevNetIncome < 0 && netIncomeVal >= 0){
+          growthBadge = `<span class="growth-badge up-text">轉虧為盈</span>`;
+        }else if(prevNetIncome >= 0 && netIncomeVal < 0){
+          growthBadge = `<span class="growth-badge down-text">轉盈為虧</span>`;
+        }else if(prevNetIncome !== 0){
+          const qoq = (netIncomeVal - prevNetIncome) / Math.abs(prevNetIncome) * 100;
+          growthBadge = `<span class="growth-badge ${qoq >= 0 ? 'up-text' : 'down-text'}">QoQ ${qoq > 0 ? '+' : ''}${qoq.toFixed(1)}%</span>`;
+        }
+      }
+    }
+
+    const statCards = [];
+    if(!isNaN(epsVal)){
+      statCards.push(`<div><div style="font-size:11px;color:var(--text-tertiary);">每股盈餘(EPS)</div><div style="font-family:var(--font-mono);font-size:20px;font-weight:700;color:${epsVal >= 0 ? 'var(--up)' : 'var(--down)'};">${epsVal.toFixed(2)}</div></div>`);
+    }
+    if(!isNaN(revenueVal)){
+      statCards.push(`<div><div style="font-size:11px;color:var(--text-tertiary);">營業收入(千元)</div><div style="font-family:var(--font-mono);font-size:14px;">${revenueVal.toLocaleString('zh-Hant-TW')}</div></div>`);
+    }
+    if(!isNaN(netIncomeVal)){
+      statCards.push(`<div><div style="font-size:11px;color:var(--text-tertiary);">本期淨利(千元)</div><div style="font-family:var(--font-mono);font-size:14px;color:${netIncomeVal >= 0 ? 'var(--up)' : 'var(--down)'};">${netIncomeVal.toLocaleString('zh-Hant-TW')}</div></div>`);
+    }
+
+    return `
+      <div class="table-wrap" style="padding:14px 16px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
+          <div style="font-size:12px;color:var(--text-secondary);">出表日期：${period}</div>
+          ${growthBadge}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;">
+          ${statCards.join('') || '<div style="font-size:12px;color:var(--text-tertiary);">這一筆沒有偵測到標準欄位，請切換到底下的原始資料檢視。</div>'}
+        </div>
+      </div>`;
+  }).join('') + `
+    <details style="margin-top:10px;">
+      <summary style="cursor:pointer;font-size:12px;color:var(--text-tertiary);">顯示原始欄位資料</summary>
+      <div id="epsRawTable" style="margin-top:8px;"></div>
+    </details>`;
+
+  renderGenericTable(document.getElementById('epsRawTable'), eps, '查無財報資料。');
 }
 
 function renderInstitutionalTable(days){
@@ -3048,6 +3246,8 @@ async function fetchQuoteOverview(code){
 
     const change = (q.prevClose != null) ? q.price - q.prevClose : null;
     const changePct = (change != null && q.prevClose) ? change / q.prevClose * 100 : null;
+
+    renderStockHeader(code, q.name, q.price, changePct);
 
     panel.innerHTML = `
       <div class="holder-grid">
