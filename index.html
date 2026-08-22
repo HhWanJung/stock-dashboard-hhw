@@ -726,9 +726,31 @@ tbody tr:hover{ background:var(--bg-raised); }
 
     <div class="totals-row" id="totalsRow"></div>
 
+    <div style="margin:20px 0 10px;font-size:13px;font-weight:700;color:var(--accent);">出入金紀錄</div>
+    <div class="table-wrap" style="padding:16px;margin-bottom:20px;">
+      <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:10px;">記錄你什麼時候匯入/匯出多少錢，讓「累計入金」線可以正確顯示。金額填正數＝入金，負數＝出金。</div>
+      <div class="add-form">
+        <input id="cashFlowDate" type="date">
+        <input id="cashFlowAmount" placeholder="金額（正=入金/負=出金）" type="number" step="1">
+        <input id="cashFlowNote" placeholder="備註（選填）">
+        <button id="cashFlowAddBtn">新增紀錄</button>
+      </div>
+      <div class="proxy-status" id="cashFlowStatus"></div>
+      <div id="cashFlowList" style="margin-top:10px;"></div>
+    </div>
+
     <div style="margin:20px 0 10px;font-size:13px;font-weight:700;color:var(--accent);">持股績效走勢</div>
     <div class="table-wrap" style="padding:16px;overflow-x:auto;margin-bottom:20px;">
-      <button id="portfolioHistoryBtn" class="tab-btn" style="margin-bottom:12px;">查詢績效走勢</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+        <button id="portfolioHistoryBtn" class="tab-btn">查詢績效走勢</button>
+        <div class="tabs" id="portfolioRangeTabs" style="margin:0;">
+          <button class="tab-btn" data-range="30">1M</button>
+          <button class="tab-btn" data-range="90">3M</button>
+          <button class="tab-btn" data-range="ytd">YTD</button>
+          <button class="tab-btn" data-range="365">1Y</button>
+          <button class="tab-btn active" data-range="all">ALL</button>
+        </div>
+      </div>
       <div class="proxy-status" id="portfolioHistoryStatus"></div>
       <div id="portfolioHistoryContainer"><div class="empty-state">每天下午系統會自動記錄一次你的總市值，累積幾天後按上面按鈕查看走勢圖。</div></div>
     </div>
@@ -1709,6 +1731,7 @@ async function loadUserDataFromServer(){
       klineAlertState = result.maAlerts || {};
       renderHoldings();
       renderWatchlist();
+      loadCashFlows();
     }else{
       setAuthStatus('讀取資料失敗：' + result.error, 'error');
     }
@@ -1718,11 +1741,22 @@ async function loadUserDataFromServer(){
 }
 
 // ---------- 持股績效走勢 ----------
+let portfolioFullHistory = null;
+let portfolioRange = 'all';
+
 function setPortfolioHistoryStatus(text, kind){
   const el = document.getElementById('portfolioHistoryStatus');
   el.textContent = text;
   el.className = 'proxy-status' + (kind ? ' ' + kind : '');
 }
+
+document.getElementById('portfolioRangeTabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('.tab-btn');
+  if(!btn) return;
+  portfolioRange = btn.dataset.range;
+  document.querySelectorAll('#portfolioRangeTabs .tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+  if(portfolioFullHistory) renderPortfolioHistory(portfolioFullHistory);
+});
 
 document.getElementById('portfolioHistoryBtn').addEventListener('click', async () => {
   if(!proxyUrl){
@@ -1746,34 +1780,156 @@ document.getElementById('portfolioHistoryBtn').addEventListener('click', async (
       return;
     }
 
-    renderPortfolioHistory(result.history || []);
-    setPortfolioHistoryStatus('已更新（共 ' + (result.history ? result.history.length : 0) + ' 個交易日資料）', 'ok');
+    portfolioFullHistory = result.history || [];
+    renderPortfolioHistory(portfolioFullHistory);
+    setPortfolioHistoryStatus('已更新（共 ' + portfolioFullHistory.length + ' 個交易日資料）', 'ok');
   }catch(err){
     setPortfolioHistoryStatus('抓取失敗：' + err.message, 'error');
   }
 });
 
-function renderPortfolioHistory(history){
+function filterHistoryByRange(history){
+  if(portfolioRange === 'all' || history.length === 0) return history;
+  const lastDate = new Date(history[history.length - 1].date);
+  let cutoff;
+  if(portfolioRange === 'ytd'){
+    cutoff = new Date(lastDate.getFullYear(), 0, 1);
+  }else{
+    const days = parseInt(portfolioRange, 10);
+    cutoff = new Date(lastDate.getTime() - days * 24 * 60 * 60 * 1000);
+  }
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  return history.filter(h => h.date >= cutoffStr);
+}
+
+function renderPortfolioHistory(fullHistory){
   const container = document.getElementById('portfolioHistoryContainer');
 
-  if(!history || history.length === 0){
+  if(!fullHistory || fullHistory.length === 0){
     container.innerHTML = '<div class="empty-state">目前還沒有累積任何績效紀錄，系統每天下午會自動記錄一次，明天再回來看看。</div>';
     return;
   }
+
+  const history = filterHistoryByRange(fullHistory);
   if(history.length < 2){
-    container.innerHTML = '<div class="empty-state">目前只有 ' + history.length + ' 天的資料，至少需要2天才能畫出走勢，明天再回來看看。</div>';
+    container.innerHTML = '<div class="empty-state">這個期間內只有 ' + history.length + ' 天資料，無法畫出走勢，換個期間篩選或明天再試試。</div>';
     return;
   }
 
-  const w = Math.max(600, history.length * 20);
-  const h = 260;
+  const latest = history[history.length - 1];
+  const first = history[0];
+  const myReturnPct = first.totalValue > 0 ? (latest.totalValue - first.totalValue) / first.totalValue * 100 : 0;
+
+  const validTaiex = history.filter(h => h.taiexValue != null);
+  let taiexReturnPct = null;
+  if(validTaiex.length >= 2){
+    taiexReturnPct = (validTaiex[validTaiex.length - 1].taiexValue - validTaiex[0].taiexValue) / validTaiex[0].taiexValue * 100;
+  }
+  const alpha = taiexReturnPct != null ? myReturnPct - taiexReturnPct : null;
+
+  const statsHtml = `
+    <div class="holder-grid" style="margin-bottom:6px;">
+      <div class="holder-card">
+        <div class="label">目前總市值</div>
+        <div class="value">${Math.round(latest.totalValue).toLocaleString('zh-Hant-TW')}</div>
+      </div>
+      <div class="holder-card">
+        <div class="label">目前總報酬率</div>
+        <div class="value ${pctColor(latest.pnlPct)}">${latest.pnlPct > 0 ? '+' : ''}${fmt(latest.pnlPct,2)}%</div>
+      </div>
+      <div class="holder-card">
+        <div class="label">期間市值變化</div>
+        <div class="value ${pctColor(myReturnPct)}">${myReturnPct > 0 ? '+' : ''}${fmt(myReturnPct,2)}%</div>
+      </div>
+      ${taiexReturnPct != null ? `
+      <div class="holder-card">
+        <div class="label">大盤同期報酬</div>
+        <div class="value ${pctColor(taiexReturnPct)}">${taiexReturnPct > 0 ? '+' : ''}${fmt(taiexReturnPct,2)}%</div>
+      </div>
+      <div class="holder-card">
+        <div class="label">超額報酬（Alpha）</div>
+        <div class="value ${pctColor(alpha)}">${alpha > 0 ? '+' : ''}${fmt(alpha,2)}%</div>
+      </div>` : ''}
+    </div>`;
+
+  container.innerHTML = statsHtml + renderReturnCompareChart(history) + renderValueVsDepositChart(history) + `
+    <div style="margin-top:6px;font-size:11px;color:var(--text-tertiary);">
+      報酬率為簡化算法（(現在市值-期初市值)/期初市值），沒有嚴謹處理期間出入金的影響——如果這段期間你有加碼或提領，數字會有落差。每天下午自動記錄一次。
+    </div>`;
+}
+
+function renderReturnCompareChart(history){
+  const w = Math.max(600, history.length * 8);
+  const h = 220;
+  const padLeft = 60, padRight = 14, padTop = 20, padBottom = 30;
+  const plotW = w - padLeft - padRight;
+  const plotH = h - padTop - padBottom;
+
+  const baseValue = history[0].totalValue;
+  const myReturns = history.map(hh => baseValue > 0 ? (hh.totalValue - baseValue) / baseValue * 100 : 0);
+
+  const validTaiexIdx = history.findIndex(hh => hh.taiexValue != null);
+  let taiexReturns = null;
+  if(validTaiexIdx !== -1){
+    const baseTaiex = history[validTaiexIdx].taiexValue;
+    taiexReturns = history.map(hh => hh.taiexValue != null ? (hh.taiexValue - baseTaiex) / baseTaiex * 100 : null);
+  }
+
+  const allVals = myReturns.concat((taiexReturns || []).filter(v => v != null)).concat([0]);
+  const maxV = Math.max(...allVals);
+  const minV = Math.min(...allVals);
+  const range = (maxV - minV) || 1;
+
+  const xFor = (i) => padLeft + (i / (history.length - 1)) * plotW;
+  const yFor = (v) => padTop + (1 - (v - minV) / range) * plotH;
+
+  let gridHtml = '';
+  [minV, (minV + maxV) / 2, maxV].forEach(v => {
+    const y = yFor(v);
+    gridHtml += `<line x1="${padLeft}" y1="${y}" x2="${w - padRight}" y2="${y}" stroke="#2C303C" stroke-width="1"/>`;
+    gridHtml += `<text x="${padLeft - 8}" y="${y + 4}" font-size="10" fill="#8B90A3" font-family="'IBM Plex Mono', monospace" text-anchor="end">${v > 0 ? '+' : ''}${v.toFixed(1)}%</text>`;
+  });
+
+  const idxs = [0, Math.floor(history.length / 2), history.length - 1];
+  let xLabels = '';
+  idxs.forEach(i => {
+    xLabels += `<text x="${xFor(i)}" y="${h - 10}" font-size="10" fill="#8B90A3" font-family="'IBM Plex Mono', monospace" text-anchor="middle">${history[i].date.slice(5)}</text>`;
+  });
+
+  const myPts = history.map((hh, i) => xFor(i) + ',' + yFor(myReturns[i])).join(' ');
+  let taiexPolyline = '';
+  if(taiexReturns){
+    const pts = history.map((hh, i) => taiexReturns[i] != null ? xFor(i) + ',' + yFor(taiexReturns[i]) : null).filter(p => p).join(' ');
+    taiexPolyline = `<polyline points="${pts}" fill="none" stroke="#8B90A3" stroke-width="1.5" stroke-dasharray="4,3"/>`;
+  }
+
+  return `
+    <div style="font-size:12px;font-weight:700;color:var(--accent);margin:16px 0 8px;">報酬率比較（我 vs 加權指數）</div>
+    <div style="font-size:11px;font-family:'IBM Plex Mono', monospace;margin-bottom:8px;">
+      <span style="color:var(--accent);">— 我的報酬率</span>　<span style="color:#8B90A3;">╌ 加權指數</span>
+    </div>
+    <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block;">
+      ${gridHtml}
+      ${taiexPolyline}
+      <polyline points="${myPts}" fill="none" stroke="var(--accent)" stroke-width="2"/>
+      ${xLabels}
+    </svg>`;
+}
+
+function renderValueVsDepositChart(history){
+  const hasCashFlowData = history.some(hh => hh.cumulativeDeposit != null && hh.cumulativeDeposit !== 0);
+
+  const w = Math.max(600, history.length * 8);
+  const h = 220;
   const padLeft = 70, padRight = 14, padTop = 20, padBottom = 30;
   const plotW = w - padLeft - padRight;
   const plotH = h - padTop - padBottom;
 
-  const values = history.map(h => h.totalValue);
-  const maxV = Math.max(...values);
-  const minV = Math.min(...values);
+  const values = history.map(hh => hh.totalValue);
+  const deposits = history.map(hh => hh.cumulativeDeposit || 0);
+  const allVals = values.concat(hasCashFlowData ? deposits : []);
+  const maxV = Math.max(...allVals);
+  const minV = Math.min(...allVals, 0);
   const range = (maxV - minV) || 1;
 
   const xFor = (i) => padLeft + (i / (history.length - 1)) * plotW;
@@ -1792,36 +1948,96 @@ function renderPortfolioHistory(history){
     xLabels += `<text x="${xFor(i)}" y="${h - 10}" font-size="10" fill="#8B90A3" font-family="'IBM Plex Mono', monospace" text-anchor="middle">${history[i].date.slice(5)}</text>`;
   });
 
-  const firstValue = history[0].totalValue;
-  const lastValue = history[history.length - 1].totalValue;
-  const overallChangePct = firstValue > 0 ? (lastValue - firstValue) / firstValue * 100 : 0;
-  const lineColor = overallChangePct >= 0 ? 'var(--up)' : 'var(--down)';
+  const valuePts = history.map((hh, i) => xFor(i) + ',' + yFor(values[i])).join(' ');
+  const depositPts = hasCashFlowData ? history.map((hh, i) => xFor(i) + ',' + yFor(deposits[i])).join(' ') : '';
 
-  const pts = history.map((h, i) => xFor(i) + ',' + yFor(h.totalValue)).join(' ');
-
-  const latest = history[history.length - 1];
-
-  container.innerHTML = `
-    <div class="holder-grid" style="margin-bottom:14px;">
-      <div class="holder-card">
-        <div class="label">目前總市值</div>
-        <div class="value">${Math.round(latest.totalValue).toLocaleString('zh-Hant-TW')}</div>
-      </div>
-      <div class="holder-card">
-        <div class="label">目前總報酬率</div>
-        <div class="value ${pctColor(latest.pnlPct)}">${latest.pnlPct > 0 ? '+' : ''}${fmt(latest.pnlPct,2)}%</div>
-      </div>
-      <div class="holder-card">
-        <div class="label">期間市值變化（${history[0].date} 至今）</div>
-        <div class="value ${pctColor(overallChangePct)}">${overallChangePct > 0 ? '+' : ''}${fmt(overallChangePct,2)}%</div>
-      </div>
+  return `
+    <div style="font-size:12px;font-weight:700;color:var(--accent);margin:20px 0 8px;">帳戶淨值 vs 累計入金</div>
+    <div style="font-size:11px;font-family:'IBM Plex Mono', monospace;margin-bottom:8px;">
+      <span style="color:var(--up);">— 帳戶淨值</span>${hasCashFlowData ? `　<span style="color:#C9A227;">╌ 累計入金</span>` : `　<span style="color:var(--text-tertiary);font-family:var(--font-sans);">（尚未記錄任何出入金，累計入金線不會顯示）</span>`}
     </div>
     <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block;">
       ${gridHtml}
-      <polyline points="${pts}" fill="none" stroke="${lineColor}" stroke-width="2"/>
+      ${hasCashFlowData ? `<polyline points="${depositPts}" fill="none" stroke="#C9A227" stroke-width="1.5" stroke-dasharray="4,3"/>` : ''}
+      <polyline points="${valuePts}" fill="none" stroke="var(--up)" stroke-width="2"/>
       ${xLabels}
-    </svg>
-    <div style="margin-top:6px;font-size:11px;color:var(--text-tertiary);">縱軸為總市值（依當時持股股數×當天收盤價計算），每天下午自動記錄一次。</div>`;
+    </svg>`;
+}
+
+// ---------- 出入金紀錄 ----------
+function setCashFlowStatus(text, kind){
+  const el = document.getElementById('cashFlowStatus');
+  el.textContent = text;
+  el.className = 'proxy-status' + (kind ? ' ' + kind : '');
+}
+
+document.getElementById('cashFlowAddBtn').addEventListener('click', async () => {
+  if(!proxyUrl){ setCashFlowStatus('請先貼上並儲存 GAS proxy 網址。', 'error'); return; }
+  if(!currentUsername){ setCashFlowStatus('請先登入帳號。', 'error'); return; }
+
+  const date = document.getElementById('cashFlowDate').value;
+  const amount = document.getElementById('cashFlowAmount').value;
+  const note = document.getElementById('cashFlowNote').value.trim();
+
+  if(!date || !amount){
+    setCashFlowStatus('請填寫日期與金額。', 'error');
+    return;
+  }
+
+  setCashFlowStatus('新增中...', '');
+  try{
+    const url = proxyUrl + '?type=addCashFlow&username=' + encodeURIComponent(currentUsername) + '&passwordHash=' + currentPasswordHash + '&date=' + encodeURIComponent(date) + '&amount=' + encodeURIComponent(amount) + '&note=' + encodeURIComponent(note);
+    const result = await fetchViaJsonp(url, 20000);
+    if(!result.ok){ setCashFlowStatus('新增失敗：' + result.error, 'error'); return; }
+    setCashFlowStatus('已新增。', 'ok');
+    document.getElementById('cashFlowAmount').value = '';
+    document.getElementById('cashFlowNote').value = '';
+    loadCashFlows();
+  }catch(err){
+    setCashFlowStatus('新增失敗：' + err.message, 'error');
+  }
+});
+
+async function loadCashFlows(){
+  if(!proxyUrl || !currentUsername) return;
+  try{
+    const url = proxyUrl + '?type=getCashFlows&username=' + encodeURIComponent(currentUsername) + '&passwordHash=' + currentPasswordHash;
+    const result = await fetchViaJsonp(url, 20000);
+    if(!result.ok) return;
+    renderCashFlowList(result.list || []);
+  }catch(err){
+    console.error('讀取出入金紀錄失敗', err);
+  }
+}
+
+function renderCashFlowList(list){
+  const container = document.getElementById('cashFlowList');
+  if(!list || list.length === 0){
+    container.innerHTML = '<div class="empty-state">尚無出入金紀錄。</div>';
+    return;
+  }
+  container.innerHTML = list.map(cf => `
+    <div class="table-wrap" style="padding:8px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-size:12px;">
+        <span style="font-family:var(--font-mono);">${cf.date}</span>　
+        <span class="${cf.amount >= 0 ? 'up-text' : 'down-text'}" style="font-family:var(--font-mono);font-weight:700;">${cf.amount > 0 ? '+' : ''}${cf.amount.toLocaleString('zh-Hant-TW')}</span>
+        ${cf.note ? '　' + cf.note : ''}
+      </div>
+      <button class="del-cf-btn" data-row="${cf.rowIndex}" style="background:none;border:none;color:var(--text-tertiary);cursor:pointer;font-size:12px;">刪除</button>
+    </div>`).join('');
+
+  container.querySelectorAll('.del-cf-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if(!confirm('確定要刪除這筆出入金紀錄嗎？')) return;
+      try{
+        const url = proxyUrl + '?type=deleteCashFlow&username=' + encodeURIComponent(currentUsername) + '&passwordHash=' + currentPasswordHash + '&rowIndex=' + btn.dataset.row;
+        await fetchViaJsonp(url, 20000);
+        loadCashFlows();
+      }catch(err){
+        alert('刪除失敗：' + err.message);
+      }
+    });
+  });
 }
 
 // ---------- CSV 匯出 ----------
@@ -4105,6 +4321,8 @@ enableEnterSubmit(['stockCodeInput'], 'stockQueryBtn');
 enableEnterSubmit(['compareCodeInput'], 'compareAddBtn');
 enableEnterSubmit(['authUsername', 'authPassword'], 'authSubmitBtn');
 enableEnterSubmit(['podcastNameInput', 'podcastRssInput'], 'podcastAddBtn');
+
+document.getElementById('cashFlowDate').value = new Date().toISOString().slice(0, 10);
 
 renderCompareChips();
 renderTicker();
