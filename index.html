@@ -696,25 +696,49 @@ tbody tr:hover{ background:var(--bg-raised); }
         <div class="tabs" id="authTabs">
           <button class="tab-btn active" data-mode="login">登入</button>
           <button class="tab-btn" data-mode="register">註冊新帳號</button>
+          <button class="tab-btn" data-mode="forgot">忘記密碼</button>
         </div>
-        <div class="add-form" style="margin-top:12px;">
+
+        <div id="authFormLogin" class="add-form" style="margin-top:12px;">
           <input id="authUsername" placeholder="帳號" maxlength="30">
           <input id="authPassword" type="password" placeholder="密碼" maxlength="60">
           <button id="authSubmitBtn" class="primary">登入</button>
         </div>
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);cursor:pointer;margin-top:8px;">
+
+        <div id="authEmailWrap" style="display:none;margin-top:8px;">
+          <input id="authEmail" placeholder="Email（選填，用來忘記密碼時收驗證碼）" style="width:100%;box-sizing:border-box;background:var(--bg-raised);border:1px solid var(--hairline);color:var(--text-primary);border-radius:6px;padding:8px 10px;font-family:var(--font-mono);font-size:13px;">
+        </div>
+
+        <div id="authFormForgotStep1" class="add-form" style="display:none;margin-top:12px;">
+          <input id="forgotUsername" placeholder="帳號">
+          <button id="forgotRequestBtn">發送驗證碼到Email</button>
+        </div>
+        <div id="authFormForgotStep2" class="add-form" style="display:none;margin-top:8px;">
+          <input id="forgotCode" placeholder="6位數驗證碼" maxlength="6">
+          <input id="forgotNewPassword" type="password" placeholder="新密碼">
+          <button id="forgotResetBtn">重設密碼</button>
+        </div>
+
+        <label id="rememberMeLabel" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);cursor:pointer;margin-top:8px;">
           <input type="checkbox" id="rememberMeCheckbox">
           記住我（存在這台裝置的瀏覽器裡，下次不用重新登入；共用裝置請不要勾選）
         </label>
         <div class="proxy-status" id="authStatus"></div>
-        <div style="font-size:11px;color:var(--text-tertiary);margin-top:6px;">帳號密碼會存在你自己的 GAS 後端（不是第三方伺服器），密碼經過雜湊處理後才傳送，但這是給親友使用的輕量方案，不是銀行等級的安全性，請不要用你其他重要帳號的密碼。</div>
+        <div style="font-size:11px;color:var(--text-tertiary);margin-top:6px;">帳號密碼會存在你自己的 GAS 後端（不是第三方伺服器），密碼經過雜湊處理後才傳送，但這是給親友使用的輕量方案，不是銀行等級的安全性，請不要用你其他重要帳號的密碼。忘記密碼功能需要註冊時有填Email，Email是透過你自己Google帳號寄出的。</div>
       </div>
     </div>
 
     <div id="loggedInPanel" style="display:none;margin-bottom:20px;">
-      <div class="table-wrap" style="padding:12px 16px;display:flex;align-items:center;justify-content:space-between;">
-        <span style="font-size:13px;">已登入：<b id="loggedInUsername" style="color:var(--accent);"></b></span>
-        <button id="logoutBtn" class="tab-btn">登出</button>
+      <div class="table-wrap" style="padding:12px 16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:13px;">已登入：<b id="loggedInUsername" style="color:var(--accent);"></b></span>
+          <button id="logoutBtn" class="tab-btn">登出</button>
+        </div>
+        <div class="add-form" style="margin-top:10px;">
+          <input id="updateEmailInput" placeholder="設定/更新Email（用於忘記密碼）">
+          <button id="updateEmailBtn">儲存Email</button>
+        </div>
+        <div class="proxy-status" id="updateEmailStatus"></div>
       </div>
     </div>
 
@@ -1613,12 +1637,21 @@ let authMode = 'login';
 let currentUsername = null;
 let currentPasswordHash = null;
 
+function updateAuthFormVisibility(){
+  document.getElementById('authFormLogin').style.display = (authMode === 'login' || authMode === 'register') ? 'flex' : 'none';
+  document.getElementById('authEmailWrap').style.display = (authMode === 'register') ? 'block' : 'none';
+  document.getElementById('authFormForgotStep1').style.display = (authMode === 'forgot') ? 'flex' : 'none';
+  document.getElementById('authFormForgotStep2').style.display = 'none';
+  document.getElementById('rememberMeLabel').style.display = (authMode === 'forgot') ? 'none' : 'flex';
+  document.getElementById('authSubmitBtn').textContent = authMode === 'login' ? '登入' : '註冊';
+}
+
 document.getElementById('authTabs').addEventListener('click', (e) => {
   const btn = e.target.closest('.tab-btn');
   if(!btn) return;
   authMode = btn.dataset.mode;
   document.querySelectorAll('#authTabs .tab-btn').forEach(b => b.classList.toggle('active', b === btn));
-  document.getElementById('authSubmitBtn').textContent = authMode === 'login' ? '登入' : '註冊';
+  updateAuthFormVisibility();
   setAuthStatus('', '');
 });
 
@@ -1646,16 +1679,17 @@ document.getElementById('authSubmitBtn').addEventListener('click', async () => {
 
   try{
     if(authMode === 'register'){
-      const url = proxyUrl + '?type=register&username=' + encodeURIComponent(username) + '&passwordHash=' + passwordHash;
+      const email = document.getElementById('authEmail').value.trim();
+      const url = proxyUrl + '?type=register&username=' + encodeURIComponent(username) + '&passwordHash=' + passwordHash + '&email=' + encodeURIComponent(email);
       const result = await fetchViaJsonp(url, 20000);
       if(!result.ok){
         setAuthStatus('註冊失敗：' + result.error, 'error');
         return;
       }
-      setAuthStatus('註冊成功！請按「登入」頁籤登入。', 'ok');
+      setAuthStatus('註冊成功！請按「登入」頁籤登入。' + (email ? '' : '（沒有填Email的話，之後沒辦法用忘記密碼功能）'), 'ok');
       authMode = 'login';
       document.querySelectorAll('#authTabs .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === 'login'));
-      document.getElementById('authSubmitBtn').textContent = '登入';
+      updateAuthFormVisibility();
       return;
     }
 
@@ -1683,6 +1717,77 @@ document.getElementById('authSubmitBtn').addEventListener('click', async () => {
     checkWatchedMaAlerts();
   }catch(err){
     setAuthStatus('連線失敗：' + err.message, 'error');
+  }
+});
+
+// ---------- 忘記密碼 ----------
+document.getElementById('forgotRequestBtn').addEventListener('click', async () => {
+  if(!proxyUrl){ setAuthStatus('請先在下方貼上並儲存 GAS proxy 網址。', 'error'); return; }
+
+  const username = document.getElementById('forgotUsername').value.trim();
+  if(!username){ setAuthStatus('請輸入帳號。', 'error'); return; }
+
+  setAuthStatus('發送中...', '');
+  try{
+    const url = proxyUrl + '?type=requestPasswordReset&username=' + encodeURIComponent(username);
+    const result = await fetchViaJsonp(url, 20000);
+    if(!result.ok){ setAuthStatus('發送失敗：' + result.error, 'error'); return; }
+
+    setAuthStatus(result.message, 'ok');
+    document.getElementById('authFormForgotStep2').style.display = 'flex';
+  }catch(err){
+    setAuthStatus('發送失敗：' + err.message, 'error');
+  }
+});
+
+document.getElementById('forgotResetBtn').addEventListener('click', async () => {
+  if(!proxyUrl) return;
+
+  const username = document.getElementById('forgotUsername').value.trim();
+  const code = document.getElementById('forgotCode').value.trim();
+  const newPassword = document.getElementById('forgotNewPassword').value;
+
+  if(!username || !code || !newPassword){
+    setAuthStatus('請填寫驗證碼與新密碼。', 'error');
+    return;
+  }
+
+  setAuthStatus('重設中...', '');
+  try{
+    const newPasswordHash = await hashPassword(username, newPassword);
+    const url = proxyUrl + '?type=resetPassword&username=' + encodeURIComponent(username) + '&code=' + encodeURIComponent(code) + '&newPasswordHash=' + newPasswordHash;
+    const result = await fetchViaJsonp(url, 20000);
+    if(!result.ok){ setAuthStatus('重設失敗：' + result.error, 'error'); return; }
+
+    setAuthStatus(result.message + ' 請切換到「登入」頁籤重新登入。', 'ok');
+    document.getElementById('forgotCode').value = '';
+    document.getElementById('forgotNewPassword').value = '';
+  }catch(err){
+    setAuthStatus('重設失敗：' + err.message, 'error');
+  }
+});
+
+// ---------- 已登入使用者自己設定/更新 Email ----------
+function setUpdateEmailStatus(text, kind){
+  const el = document.getElementById('updateEmailStatus');
+  el.textContent = text;
+  el.className = 'proxy-status' + (kind ? ' ' + kind : '');
+}
+
+document.getElementById('updateEmailBtn').addEventListener('click', async () => {
+  if(!proxyUrl || !currentUsername) return;
+  const email = document.getElementById('updateEmailInput').value.trim();
+  if(!email){ setUpdateEmailStatus('請輸入Email。', 'error'); return; }
+
+  setUpdateEmailStatus('儲存中...', '');
+  try{
+    const url = proxyUrl + '?type=setAccountEmail&username=' + encodeURIComponent(currentUsername) + '&passwordHash=' + currentPasswordHash + '&email=' + encodeURIComponent(email);
+    const result = await fetchViaJsonp(url, 20000);
+    if(!result.ok){ setUpdateEmailStatus('儲存失敗：' + result.error, 'error'); return; }
+    setUpdateEmailStatus('已更新！之後忘記密碼可以用這組Email收驗證碼。', 'ok');
+    document.getElementById('updateEmailInput').value = '';
+  }catch(err){
+    setUpdateEmailStatus('儲存失敗：' + err.message, 'error');
   }
 });
 
