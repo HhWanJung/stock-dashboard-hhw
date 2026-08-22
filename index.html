@@ -492,11 +492,16 @@ tbody tr:hover{ background:var(--bg-raised); }
 .cal-chips{ display:flex; flex-wrap:wrap; gap:2px; margin-top:3px; }
 .cal-chip{
   font-size:9px;
-  font-family:var(--font-mono);
+  font-family:var(--font-sans);
   background:rgba(201,162,39,0.15);
   color:var(--accent);
   border-radius:3px;
   padding:1px 3px;
+  display:block;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  max-width:100%;
 }
 .cal-chip-more{ font-size:9px; color:var(--text-tertiary); padding:1px 2px; }
 
@@ -2971,8 +2976,8 @@ function renderBasicInfo(basicInfo){
       ['產業別', basicInfo['產業別']],
       ['董事長', basicInfo['董事長']],
       ['總經理', basicInfo['總經理']],
-      ['成立日期', basicInfo['成立日期']],
-      ['上市日期', basicInfo['上市日期']],
+      ['成立日期', formatWesternDate(basicInfo['成立日期'])],
+      ['上市日期', formatWesternDate(basicInfo['上市日期'])],
       ['實收資本額', basicInfo['實收資本額'] ? Number(basicInfo['實收資本額']).toLocaleString('zh-Hant-TW') : '—'],
       ['網址', basicInfo['網址']]
     ].filter(r => r[1]);
@@ -3133,6 +3138,14 @@ function formatRocDate(s){
   if(!/^\d{7}$/.test(s)) return s;
   const rocYear = parseInt(s.slice(0, 3), 10);
   return (rocYear + 1911) + '-' + s.slice(3, 5) + '-' + s.slice(5, 7);
+}
+
+// 把 "19870221" 這種8位數西元年日期字串轉成 "1987-02-21"
+function formatWesternDate(s){
+  if(!s) return s;
+  s = String(s);
+  if(!/^\d{8}$/.test(s)) return s;
+  return s.slice(0, 4) + '-' + s.slice(4, 6) + '-' + s.slice(6, 8);
 }
 
 function renderRevenue(revenue){
@@ -3547,7 +3560,7 @@ function renderCalendarGrid(){
     if(dateStr === todayStr) classes.push('today');
     if(dateStr === calendarSelectedDate) classes.push('selected');
 
-    const chips = events.slice(0, 3).map(e => `<div class="cal-chip">${e.code}</div>`).join('');
+    const chips = events.slice(0, 3).map(e => `<div class="cal-chip" title="${e.name}（${e.code}）">${e.name}</div>`).join('');
     const more = events.length > 3 ? `<div class="cal-chip-more">+${events.length - 3}</div>` : '';
 
     html += `<div class="${classes.join(' ')}" data-date="${dateStr}">
@@ -3954,14 +3967,23 @@ function renderPodcastList(list){
     return;
   }
 
-  container.innerHTML = list.map(p => `
-    <div class="table-wrap" style="padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
-      <div>
-        <div><b>${p.name}</b></div>
-        <div style="font-size:11px;color:var(--text-tertiary);">${p.lastEpisodeTitle ? '最新集數：' + p.lastEpisodeTitle : '尚未偵測到集數'}</div>
+  container.innerHTML = list.map(p => {
+    const episodesHtml = (p.recentEpisodes && p.recentEpisodes.length > 0)
+      ? p.recentEpisodes.map(ep => `
+          <div style="font-size:12px;margin-top:4px;">
+            <a href="${ep.link}" target="_blank" rel="noopener" style="color:#3B82C4;text-decoration:none;">🔗 ${ep.title}</a>
+          </div>`).join('')
+      : `<div style="font-size:11px;color:var(--text-tertiary);margin-top:4px;">尚未偵測到集數。</div>`;
+
+    return `
+    <div class="table-wrap" style="padding:10px 14px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <b>${p.name}</b>
+        <button class="del-btn" data-name="${p.name}">刪除</button>
       </div>
-      <button class="del-btn" data-name="${p.name}">刪除</button>
-    </div>`).join('');
+      ${episodesHtml}
+    </div>`;
+  }).join('');
 
   container.querySelectorAll('.del-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
