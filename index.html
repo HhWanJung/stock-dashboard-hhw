@@ -99,6 +99,13 @@ body{
     flex:0 0 auto;
   }
   .nav-item{ flex:0 0 auto; }
+  .page{ padding:0 0.75rem; }
+  .add-form input{ width:auto; flex:1 1 120px; min-width:100px; }
+  .add-form button,
+  .tab-btn,
+  button{ min-height:40px; }
+  .add-form{ padding:12px; }
+  .index-grid, .holder-grid{ gap:8px; }
 }
 
 /* ---------- Ticker tape (signature element) ---------- */
@@ -616,6 +623,10 @@ tbody tr:hover{ background:var(--bg-raised); }
           <input id="authPassword" type="password" placeholder="密碼" maxlength="60">
           <button id="authSubmitBtn" class="primary">登入</button>
         </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);cursor:pointer;margin-top:8px;">
+          <input type="checkbox" id="rememberMeCheckbox">
+          記住我（存在這台裝置的瀏覽器裡，下次不用重新登入；共用裝置請不要勾選）
+        </label>
         <div class="proxy-status" id="authStatus"></div>
         <div style="font-size:11px;color:var(--text-tertiary);margin-top:6px;">帳號密碼會存在你自己的 GAS 後端（不是第三方伺服器），密碼經過雜湊處理後才傳送，但這是給親友使用的輕量方案，不是銀行等級的安全性，請不要用你其他重要帳號的密碼。</div>
       </div>
@@ -665,6 +676,7 @@ tbody tr:hover{ background:var(--bg-raised); }
       <input id="inputShares" placeholder="股數" type="number" min="1">
       <input id="inputCost" placeholder="成本價" type="number" step="0.01" min="0">
       <button id="addBtn">新增持股</button>
+      <button id="exportHoldingsBtn" class="tab-btn">匯出CSV</button>
     </div>
 
     </div>
@@ -699,6 +711,7 @@ tbody tr:hover{ background:var(--bg-raised); }
     <div class="add-form">
       <input id="watchInputCode" placeholder="代號 例如 2330" maxlength="6">
       <button id="watchAddBtn">加入關注</button>
+      <button id="exportWatchlistBtn" class="tab-btn">匯出CSV</button>
     </div>
 
     </div>
@@ -1528,6 +1541,16 @@ document.getElementById('authSubmitBtn').addEventListener('click', async () => {
 
     currentUsername = username;
     currentPasswordHash = passwordHash;
+
+    if(document.getElementById('rememberMeCheckbox').checked){
+      try{
+        localStorage.setItem('tw-dashboard:remember-username', username);
+        localStorage.setItem('tw-dashboard:remember-passwordhash', passwordHash);
+      }catch(e){
+        console.error('記住登入資訊失敗', e);
+      }
+    }
+
     await loadUserDataFromServer();
     showLoggedInUI();
     checkWatchedMaAlerts();
@@ -1542,6 +1565,10 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
   holdings = [];
   watchlist = [];
   klineAlertState = {};
+  try{
+    localStorage.removeItem('tw-dashboard:remember-username');
+    localStorage.removeItem('tw-dashboard:remember-passwordhash');
+  }catch(e){}
   renderHoldings();
   renderWatchlist();
   showLoggedOutUI();
@@ -1692,6 +1719,49 @@ function renderPortfolioHistory(history){
     <div style="margin-top:6px;font-size:11px;color:var(--text-tertiary);">縱軸為總市值（依當時持股股數×當天收盤價計算），每天下午自動記錄一次。</div>`;
 }
 
+// ---------- CSV 匯出 ----------
+function downloadCsv(filename, rows){
+  const csvContent = rows.map(row => row.map(cell => {
+    const s = String(cell === null || cell === undefined ? '' : cell);
+    // 如果內容有逗號、雙引號或換行，要用雙引號包起來
+    if(s.includes(',') || s.includes('"') || s.includes('\n')){
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  }).join(',')).join('\r\n');
+
+  // 加上 BOM，避免中文在 Excel 打開時變亂碼
+  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('exportHoldingsBtn').addEventListener('click', () => {
+  if(!holdings || holdings.length === 0){
+    alert('目前沒有持股可以匯出。');
+    return;
+  }
+  const rows = [['代號', '股數', '成本價']];
+  holdings.forEach(h => rows.push([h.code, h.shares, h.cost]));
+  downloadCsv('持股清單_' + new Date().toISOString().slice(0,10) + '.csv', rows);
+});
+
+document.getElementById('exportWatchlistBtn').addEventListener('click', () => {
+  if(!watchlist || watchlist.length === 0){
+    alert('目前沒有關注股票可以匯出。');
+    return;
+  }
+  const rows = [['代號']];
+  watchlist.forEach(code => rows.push([code]));
+  downloadCsv('關注股票_' + new Date().toISOString().slice(0,10) + '.csv', rows);
+});
+
 let holdings = [];
 let watchlist = []; // 陣列，每個元素是股票代號字串
 
@@ -1790,11 +1860,17 @@ async function saveHoldings(){
   }
 }
 
+// ⚠️ 把下面這個換成你自己的 GAS 部署網址，這樣朋友打開網站就不用自己貼網址了
+const DEFAULT_PROXY_URL = 'https://script.google.com/macros/s/AKfycbzczj9xVJGXWrKOX97YB7kCcWXYmiGPzuGcRUTYEuE0_ab3Ylnwkx5WsLLp967o_iqU/exec';
+
 async function loadProxyUrl(){
   try{
-    proxyUrl = localStorage.getItem('tw-dashboard:proxy-url') || '';
+    proxyUrl = localStorage.getItem('tw-dashboard:proxy-url') || DEFAULT_PROXY_URL || '';
+    if(proxyUrl && !localStorage.getItem('tw-dashboard:proxy-url')){
+      localStorage.setItem('tw-dashboard:proxy-url', proxyUrl); // 第一次用預設值時順便存起來
+    }
   }catch(e){
-    proxyUrl = '';
+    proxyUrl = DEFAULT_PROXY_URL || '';
   }
   document.getElementById('proxyUrlInput').value = proxyUrl;
 }
@@ -3737,6 +3813,28 @@ function renderHoldingsDigest(list){
   });
 }
 
+// ---------- 輸入框按 Enter 直接送出（減少一定要點按鈕的麻煩）----------
+function enableEnterSubmit(inputIds, buttonId){
+  inputIds.forEach(id => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter'){
+        e.preventDefault();
+        const btn = document.getElementById(buttonId);
+        if(btn) btn.click();
+      }
+    });
+  });
+}
+
+enableEnterSubmit(['inputCode', 'inputShares', 'inputCost'], 'addBtn');
+enableEnterSubmit(['watchInputCode'], 'watchAddBtn');
+enableEnterSubmit(['stockCodeInput'], 'stockQueryBtn');
+enableEnterSubmit(['compareCodeInput'], 'compareAddBtn');
+enableEnterSubmit(['authUsername', 'authPassword'], 'authSubmitBtn');
+enableEnterSubmit(['podcastNameInput', 'podcastRssInput'], 'podcastAddBtn');
+
 renderCompareChips();
 renderTicker();
 renderIndices();
@@ -3748,6 +3846,26 @@ renderUpdatedTime();
   showLoggedOutUI();
   if(proxyUrl){
     refreshAllData();
+  }
+
+  // 檢查是否有「記住我」存下來的登入資訊，有的話自動登入
+  try{
+    const rememberedUsername = localStorage.getItem('tw-dashboard:remember-username');
+    const rememberedHash = localStorage.getItem('tw-dashboard:remember-passwordhash');
+    if(rememberedUsername && rememberedHash && proxyUrl){
+      const url = proxyUrl + '?type=login&username=' + encodeURIComponent(rememberedUsername) + '&passwordHash=' + rememberedHash;
+      const result = await fetchViaJsonp(url, 20000);
+      if(result.ok){
+        currentUsername = rememberedUsername;
+        currentPasswordHash = rememberedHash;
+        document.getElementById('rememberMeCheckbox').checked = true;
+        await loadUserDataFromServer();
+        showLoggedInUI();
+        checkWatchedMaAlerts();
+      }
+    }
+  }catch(e){
+    console.error('自動登入失敗', e);
   }
 })();
 </script>
