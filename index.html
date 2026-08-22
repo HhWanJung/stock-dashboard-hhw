@@ -738,6 +738,7 @@ tbody tr:hover{ background:var(--bg-raised); }
       <button class="tab-btn" data-subtab="margin">融資融券</button>
       <button class="tab-btn" data-subtab="holders">大戶</button>
       <button class="tab-btn" data-subtab="revenue">營收</button>
+      <button class="tab-btn" data-subtab="eps">獲利</button>
       <button class="tab-btn" data-subtab="basic">基本資料</button>
       <button class="tab-btn" data-subtab="dividends">除權息</button>
     </div>
@@ -859,6 +860,13 @@ tbody tr:hover{ background:var(--bg-raised); }
     <div class="stock-subpanel" id="subpanel-revenue">
       <div class="table-wrap" style="overflow-x:auto;">
         <div id="revenueContainer"><div class="empty-state">查詢後顯示近12個月營收。</div></div>
+      </div>
+    </div>
+
+    <div class="stock-subpanel" id="subpanel-eps">
+      <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:8px;">最近4季綜合損益表，依「一般業/金控業/證券期貨業/保險業/金融業/異業」分類查詢，欄位含每股盈餘（EPS）。</div>
+      <div class="table-wrap" style="overflow-x:auto;">
+        <div id="epsContainer"><div class="empty-state">查詢後顯示近4季財報。</div></div>
       </div>
     </div>
 
@@ -2809,11 +2817,12 @@ async function fetchInstitutional(code){
 async function fetchFundamental(code){
   if(!proxyUrl) return;
 
-  document.getElementById('basicInfoPanel').innerHTML = '<div class="empty-state">抓取中...（融資融券+外資持股+基本資料+除權息+月營收，可能需要40-60秒，請耐心等候）</div>';
+  document.getElementById('basicInfoPanel').innerHTML = '<div class="empty-state">抓取中...（融資融券+外資持股+基本資料+除權息+月營收+財報，可能需要40-60秒，請耐心等候）</div>';
   document.getElementById('marginChartContainer').innerHTML = '<div class="empty-state">抓取中...</div>';
   document.getElementById('dividendsContainer').innerHTML = '<div class="empty-state">抓取中...</div>';
   document.getElementById('revenueContainer').innerHTML = '<div class="empty-state">抓取中...</div>';
   document.getElementById('foreignHoldingPanel').innerHTML = '<div class="empty-state">抓取中...</div>';
+  document.getElementById('epsContainer').innerHTML = '<div class="empty-state">抓取中...</div>';
 
   try{
     const url = proxyUrl + '?type=fundamental&code=' + encodeURIComponent(code);
@@ -2825,6 +2834,7 @@ async function fetchFundamental(code){
     renderMarginTable(data.margin || []);
     renderDividends(data.dividends);
     renderRevenue(data.revenue);
+    renderEps(data.eps);
   }catch(err){
     document.getElementById('basicInfoPanel').innerHTML = `<div class="empty-state">基本面資料抓取失敗：${err.message}</div>`;
   }
@@ -2987,6 +2997,10 @@ function renderDividends(dividends){
 
 function renderRevenue(revenue){
   renderGenericTable(document.getElementById('revenueContainer'), revenue, '查無月營收資料。');
+}
+
+function renderEps(eps){
+  renderGenericTable(document.getElementById('epsContainer'), eps, '查無財報資料。');
 }
 
 function renderInstitutionalTable(days){
