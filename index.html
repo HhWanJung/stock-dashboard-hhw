@@ -987,6 +987,20 @@ tbody tr:hover{ background:var(--bg-raised); }
       內容每 10 分鐘快取一次，短時間內重複按不會重新抓取。
     </div>
 
+    <div class="table-wrap" style="padding:16px;margin-bottom:1.5rem;">
+      <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:8px;">🔔 每天自動推播到 LINE</div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;line-height:1.6;">
+        設定好之後，系統會每天<b>早上8點</b>推播盤前摘要、<b>下午2點</b>推播盤後摘要到你設定的 LINE 帳號/群組。<br>
+        設定步驟：在 Apps Script「專案設定」→「指令碼屬性」設定 <code>LINE_CHANNEL_TOKEN</code> 跟 <code>LINE_TARGET_ID</code>（沿用你之前測試過的那組），
+        再手動執行一次 <code>installMarketSummaryPushTriggers</code> 建立排程。
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button id="testPushPremarketBtn" class="tab-btn">測試推播盤前摘要</button>
+        <button id="testPushPostmarketBtn" class="tab-btn">測試推播盤後摘要</button>
+      </div>
+      <div class="proxy-status" id="linePushStatus"></div>
+    </div>
+
     <div class="tabs" id="summaryTabs">
       <button class="tab-btn active" data-period="premarket">盤前摘要</button>
       <button class="tab-btn" data-period="postmarket">盤後摘要</button>
@@ -3508,6 +3522,37 @@ function setDigestStatus(text, kind){
   el.textContent = text;
   el.className = 'proxy-status' + (kind ? ' ' + kind : '');
 }
+
+function setLinePushStatus(text, kind){
+  const el = document.getElementById('linePushStatus');
+  el.textContent = text;
+  el.className = 'proxy-status' + (kind ? ' ' + kind : '');
+}
+
+async function testLinePush(period){
+  if(!proxyUrl){
+    setLinePushStatus('請先在「個人存股表現」區塊貼上並儲存 GAS proxy 網址。', 'error');
+    return;
+  }
+
+  setLinePushStatus('推播中...（要先產生摘要內容，可能需要10-20秒）', '');
+
+  try{
+    const url = proxyUrl + '?type=testLinePush&period=' + period;
+    const result = await fetchViaJsonp(url, 40000);
+
+    if(!result.ok){
+      setLinePushStatus('推播失敗：' + result.error, 'error');
+      return;
+    }
+    setLinePushStatus('已推播成功，請check你的 LINE。', 'ok');
+  }catch(err){
+    setLinePushStatus('推播失敗：' + err.message, 'error');
+  }
+}
+
+document.getElementById('testPushPremarketBtn').addEventListener('click', () => testLinePush('premarket'));
+document.getElementById('testPushPostmarketBtn').addEventListener('click', () => testLinePush('postmarket'));
 
 document.getElementById('digestRefreshBtn').addEventListener('click', async () => {
   if(!proxyUrl){
