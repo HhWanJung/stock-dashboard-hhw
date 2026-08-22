@@ -55,6 +55,19 @@ body{
   padding:8px;
   align-self:flex-start;
 }
+.global-search-wrap{ padding:0 2px 8px; margin-bottom:6px; border-bottom:1px solid var(--hairline); }
+.global-search-wrap input{
+  width:100%;
+  background:var(--bg-raised);
+  border:1px solid var(--hairline);
+  color:var(--text-primary);
+  border-radius:6px;
+  padding:8px 10px;
+  font-family:var(--font-mono);
+  font-size:13px;
+  box-sizing:border-box;
+}
+.global-search-wrap input::placeholder{ color:var(--text-tertiary); font-family:var(--font-sans); }
 .nav-item{
   display:flex;
   align-items:center;
@@ -99,6 +112,7 @@ body{
     flex:0 0 auto;
   }
   .nav-item{ flex:0 0 auto; }
+  .global-search-wrap{ flex:0 0 130px; padding:0 6px 0 0; margin-bottom:0; border-bottom:none; border-right:1px solid var(--hairline); }
   .page{ padding:0 0.75rem; }
   .add-form input{ width:auto; flex:1 1 120px; min-width:100px; }
   .add-form button,
@@ -602,6 +616,9 @@ tbody tr:hover{ background:var(--bg-raised); }
 
   <div class="app-layout">
     <nav class="sidebar" id="sidebarNav">
+      <div class="global-search-wrap">
+        <input id="globalSearchInput" placeholder="🔍 代號快速跳轉" maxlength="6">
+      </div>
       <button class="nav-item active" data-target="section-market"><span class="nav-num">01</span>大盤表現</button>
       <button class="nav-item" data-target="section-trending"><span class="nav-num">02</span>話題個股表現</button>
       <button class="nav-item" data-target="section-holdings"><span class="nav-num">03</span>個人存股表現</button>
@@ -1338,6 +1355,22 @@ function jumpToKline(code){
   switchStockSubtab('kline');
   queryStock(code);
 }
+
+// ---------- 全站搜尋跳轉：輸入代號按 Enter，跳到「05 個股」的報價概況 ----------
+function jumpToStockOverview(code){
+  switchTab('individualSection');
+  switchStockSubtab('quote');
+  queryStock(code);
+}
+
+document.getElementById('globalSearchInput').addEventListener('keydown', (e) => {
+  if(e.key !== 'Enter') return;
+  const code = e.target.value.trim();
+  if(!code) return;
+  jumpToStockOverview(code);
+  e.target.value = '';
+  e.target.blur();
+});
 
 function switchStockSubtab(target){
   document.querySelectorAll('#stockSubTabs .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.subtab === target));
