@@ -2876,7 +2876,7 @@ async function fetchInstitutional(code){
 async function fetchFundamental(code){
   if(!proxyUrl) return;
 
-  document.getElementById('basicInfoPanel').innerHTML = '<div class="empty-state">抓取中...（融資融券+外資持股+基本資料+除權息+月營收+財報，可能需要40-60秒，請耐心等候）</div>';
+  document.getElementById('basicInfoPanel').innerHTML = '<div class="empty-state">抓取中...（融資融券+外資持股+基本資料+除權息+月營收+財報，財報要試多種產業分類，可能需要60-120秒，請耐心等候）</div>';
   document.getElementById('marginChartContainer').innerHTML = '<div class="empty-state">抓取中...</div>';
   document.getElementById('dividendsContainer').innerHTML = '<div class="empty-state">抓取中...</div>';
   document.getElementById('revenueContainer').innerHTML = '<div class="empty-state">抓取中...</div>';
@@ -2885,7 +2885,7 @@ async function fetchFundamental(code){
 
   try{
     const url = proxyUrl + '?type=fundamental&code=' + encodeURIComponent(code);
-    const data = await fetchViaJsonp(url, 100000);
+    const data = await fetchViaJsonp(url, 170000);
 
     renderBasicInfo(data.basicInfo);
     renderForeignHolding(data.foreignHolding);
