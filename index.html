@@ -4061,19 +4061,20 @@ async function fetchStrategyStatus(){
       renderCriteriaCheckboxes(data.criteriaOptions, data.criteria);
     }
 
-    renderStrategyProgress(data.daysCollected, data.instDaysCollected);
+    renderStrategyProgress(data.daysCollected, data.instDaysCollected, data.holderWeeksCollected);
     renderStrategyOpen(data.openPositions || []);
     renderStrategyClosed(data.closedPositions || []);
-    setStrategyStatus('已更新（已累積 ' + data.daysCollected + ' 個交易日的市場快照，法人快照 ' + (data.instDaysCollected || 0) + ' 天）', 'ok');
+    setStrategyStatus('已更新（已累積 ' + data.daysCollected + ' 個交易日的市場快照，法人快照 ' + (data.instDaysCollected || 0) + ' 天，大戶快照 ' + (data.holderWeeksCollected || 0) + ' 週）', 'ok');
   }catch(err){
     setStrategyStatus('抓取失敗：' + err.message, 'error');
   }
 }
 
-function renderStrategyProgress(daysCollected, instDaysCollected){
+function renderStrategyProgress(daysCollected, instDaysCollected, holderWeeksCollected){
   const panel = document.getElementById('strategyProgressPanel');
   const needed = 5;
   const instNeeded = 3;
+  const holderNeeded = 2;
 
   const priceCard = daysCollected >= needed
     ? `<div class="holder-card">
@@ -4097,7 +4098,18 @@ function renderStrategyProgress(daysCollected, instDaysCollected){
         <div class="sub">「法人連續買超」條件需要這個</div>
       </div>`;
 
-  panel.innerHTML = `<div class="holder-grid">${priceCard}${instCard}</div>`;
+  const holderCard = (holderWeeksCollected || 0) >= holderNeeded
+    ? `<div class="holder-card">
+        <div class="label">大戶快照進度</div>
+        <div class="value" style="color:var(--up);">已足夠（${holderWeeksCollected} 週）</div>
+      </div>`
+    : `<div class="holder-card">
+        <div class="label">大戶快照進度</div>
+        <div class="value">${holderWeeksCollected || 0} / ${holderNeeded} 週</div>
+        <div class="sub">「大戶佔比上升」「千張大戶人數增加」需要這個，每週更新一次</div>
+      </div>`;
+
+  panel.innerHTML = `<div class="holder-grid">${priceCard}${instCard}${holderCard}</div>`;
 }
 
 function renderStrategyOpen(positions){
