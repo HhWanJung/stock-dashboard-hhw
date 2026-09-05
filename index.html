@@ -3739,12 +3739,22 @@ function renderHolderPanel(holders){
       <div class="holder-card">
         <div class="label">千張大戶佔比（1,000張以上）</div>
         <div class="value" style="color:var(--up);">${holders.concentration1000Lots.toFixed(2)}%</div>
-        <div class="sub">資料日期：${holders.asOfDate}</div>
+        <div class="sub">${holders.holders1000Lots != null ? holders.holders1000Lots.toLocaleString('zh-Hant-TW') + ' 人' : ''}　資料日期：${holders.asOfDate}</div>
       </div>
       <div class="holder-card">
         <div class="label">大戶佔比（400張以上）</div>
         <div class="value" style="color:var(--up);">${holders.concentration400Lots.toFixed(2)}%</div>
-        <div class="sub">集保戶股權分散表，每週更新一次</div>
+        <div class="sub">${holders.holders400Lots != null ? holders.holders400Lots.toLocaleString('zh-Hant-TW') + ' 人' : '集保戶股權分散表，每週更新一次'}</div>
+      </div>
+      <div class="holder-card">
+        <div class="label">總持股人數</div>
+        <div class="value">${holders.totalHolders != null ? holders.totalHolders.toLocaleString('zh-Hant-TW') : '—'}</div>
+        <div class="sub">全體集保戶（含所有級距）</div>
+      </div>
+      <div class="holder-card">
+        <div class="label">人均持股張數</div>
+        <div class="value">${holders.avgLotsPerHolder != null ? holders.avgLotsPerHolder.toLocaleString('zh-Hant-TW', {maximumFractionDigits:2}) : '—'}</div>
+        <div class="sub">數字愈大代表籌碼愈集中在少數人手上</div>
       </div>
       <div class="holder-card">
         <div class="label">持股分級分布（第1～15級）</div>
