@@ -324,6 +324,12 @@ tbody tr:hover{ background:var(--bg-raised); }
   color:var(--text-tertiary);
   font-size:13px;
 }
+.empty-state.error{
+  color:var(--down);
+  background:rgba(224,90,90,0.06);
+  border:1px solid rgba(224,90,90,0.25);
+  border-radius:8px;
+}
 
 .proxy-settings{
   display:flex;
@@ -739,6 +745,16 @@ tbody tr:hover{ background:var(--bg-raised); }
           <button id="updateEmailBtn">儲存Email</button>
         </div>
         <div class="proxy-status" id="updateEmailStatus"></div>
+
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--hairline);">
+          <div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px;">📱 LINE個人持股摘要推播</div>
+          <div id="lineLinkStatusDisplay" style="font-size:12px;color:var(--text-tertiary);">查詢中...</div>
+          <div style="font-size:11px;color:var(--text-tertiary);margin-top:6px;line-height:1.6;">
+            綁定後，每天下午2點半會收到自己的持股摘要（只有你自己看得到，其他人不會收到）。
+            設定方式：<b>私訊「馬上有錢」這個LINE官方帳號</b>，傳「<b>綁定帳號 </b>你的Dashboard帳號名稱」這句話即可。
+          </div>
+          <button id="unlinkLineBtn" class="tab-btn" style="margin-top:8px;display:none;">解除LINE綁定</button>
+        </div>
       </div>
     </div>
 
@@ -1791,6 +1807,49 @@ document.getElementById('updateEmailBtn').addEventListener('click', async () => 
   }
 });
 
+// ---------- LINE 個人推播綁定狀態 ----------
+async function loadLineLinkStatus(){
+  const display = document.getElementById('lineLinkStatusDisplay');
+  const unlinkBtn = document.getElementById('unlinkLineBtn');
+  if(!proxyUrl || !currentUsername){
+    display.textContent = '尚未登入。';
+    return;
+  }
+
+  display.textContent = '查詢中...';
+  try{
+    const url = proxyUrl + '?type=getLineLinkStatus&username=' + encodeURIComponent(currentUsername) + '&passwordHash=' + currentPasswordHash;
+    const result = await fetchViaJsonp(url, 20000);
+    if(!result.ok){
+      display.textContent = '查詢失敗：' + result.error;
+      unlinkBtn.style.display = 'none';
+      return;
+    }
+    if(result.linked){
+      display.innerHTML = '<span class="up-text">✅ 已綁定，每天下午2點半會收到你的持股摘要</span>';
+      unlinkBtn.style.display = 'inline-block';
+    }else{
+      display.textContent = '尚未綁定LINE個人推播。';
+      unlinkBtn.style.display = 'none';
+    }
+  }catch(err){
+    display.textContent = '查詢失敗：' + err.message;
+  }
+}
+
+document.getElementById('unlinkLineBtn').addEventListener('click', async () => {
+  if(!proxyUrl || !currentUsername) return;
+  if(!confirm('確定要解除LINE個人推播綁定嗎？')) return;
+
+  try{
+    const url = proxyUrl + '?type=unlinkLineAccount&username=' + encodeURIComponent(currentUsername) + '&passwordHash=' + currentPasswordHash;
+    await fetchViaJsonp(url, 20000);
+    loadLineLinkStatus();
+  }catch(err){
+    alert('解除失敗：' + err.message);
+  }
+});
+
 document.getElementById('logoutBtn').addEventListener('click', () => {
   currentUsername = null;
   currentPasswordHash = null;
@@ -1837,6 +1896,7 @@ async function loadUserDataFromServer(){
       renderHoldings();
       renderWatchlist();
       loadCashFlows();
+      loadLineLinkStatus();
     }else{
       setAuthStatus('讀取資料失敗：' + result.error, 'error');
     }
@@ -2316,6 +2376,15 @@ function setProxyStatus(text, kind){
   el.className = 'proxy-status' + (kind ? ' ' + kind : '');
 }
 
+// ⚠️ 如果你有在GAS那邊設定 API_SECRET 指令碼屬性，這裡也要填一樣的值，否則Dashboard會被自己設的保護擋下來
+// 沒有設定 API_SECRET 的話，這裡留空字串就好，不影響任何功能
+const API_KEY = '';
+
+// 統一的錯誤狀態顯示樣式，全站共用（紅色調，跟一般「尚無資料」的灰色提示做出區隔）
+function errorStateHtml(message){
+  return '<div class="empty-state error">⚠️ ' + message + '</div>';
+}
+
 function fetchViaJsonp(url, timeoutMs = 8000){
   return new Promise((resolve, reject) => {
     const callbackName = 'twDashboardCb_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
@@ -2349,8 +2418,13 @@ function fetchViaJsonp(url, timeoutMs = 8000){
       reject(new Error('無法載入，請確認網址是否正確、部署是否已開放給任何人'));
     };
 
-    const sep = url.includes('?') ? '&' : '?';
-    script.src = url + sep + 'callback=' + callbackName;
+    let fullUrl = url;
+    if(API_KEY){
+      const keySep = fullUrl.includes('?') ? '&' : '?';
+      fullUrl = fullUrl + keySep + 'key=' + encodeURIComponent(API_KEY);
+    }
+    const sep = fullUrl.includes('?') ? '&' : '?';
+    script.src = fullUrl + sep + 'callback=' + callbackName;
     document.body.appendChild(script);
   });
 }
@@ -3254,7 +3328,7 @@ async function fetchFundamental(code){
     renderRevenue(data.revenue);
     renderEps(data.eps);
   }catch(err){
-    document.getElementById('basicInfoPanel').innerHTML = `<div class="empty-state">基本面資料抓取失敗：${err.message}</div>`;
+    document.getElementById('basicInfoPanel').innerHTML = errorStateHtml('基本面資料抓取失敗：' + err.message);
   }
 }
 
@@ -3429,8 +3503,12 @@ function formatFundamentalValue(key, value){
 }
 
 function renderGenericTable(container, rows, emptyMsg){
-  if(!rows || rows.error || rows.length === 0){
-    container.innerHTML = `<div class="empty-state">${(rows && rows.error) || emptyMsg}</div>`;
+  if(rows && rows.error){
+    container.innerHTML = errorStateHtml(rows.error);
+    return;
+  }
+  if(!rows || rows.length === 0){
+    container.innerHTML = `<div class="empty-state">${emptyMsg}</div>`;
     return;
   }
 
@@ -3472,7 +3550,7 @@ function formatWesternDate(s){
 function renderRevenue(revenue){
   const container = document.getElementById('revenueContainer');
   if(!revenue || revenue.error || revenue.length === 0){
-    container.innerHTML = `<div class="empty-state">${(revenue && revenue.error) || '查無月營收資料。'}</div>`;
+    container.innerHTML = (revenue && revenue.error) ? errorStateHtml(revenue.error) : `<div class="empty-state">查無月營收資料。</div>`;
     return;
   }
 
@@ -3505,7 +3583,7 @@ function renderRevenue(revenue){
 function renderEps(eps){
   const container = document.getElementById('epsContainer');
   if(!eps || eps.error || !Array.isArray(eps) || eps.length === 0){
-    container.innerHTML = `<div class="empty-state">${(eps && eps.error) || '查無財報資料。'}</div>`;
+    container.innerHTML = (eps && eps.error) ? errorStateHtml(eps.error) : `<div class="empty-state">查無財報資料。</div>`;
     return;
   }
 
@@ -3609,7 +3687,7 @@ async function fetchQuoteOverview(code){
     const q = data[code];
 
     if(!q || q.error){
-      panel.innerHTML = `<div class="empty-state">查無資料：${(q && q.error) || '請確認代號是否正確'}</div>`;
+      panel.innerHTML = errorStateHtml('查無資料：' + ((q && q.error) || '請確認代號是否正確'));
       return;
     }
 
@@ -3648,7 +3726,7 @@ async function fetchQuoteOverview(code){
       </div>
       <div style="margin-top:8px;font-size:11px;color:var(--text-tertiary);">更新時間：${q.time || '—'}</div>`;
   }catch(err){
-    panel.innerHTML = `<div class="empty-state">抓取失敗：${err.message}</div>`;
+    panel.innerHTML = errorStateHtml('抓取失敗：' + err.message);
   }
 }
 
