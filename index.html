@@ -1114,9 +1114,10 @@ tbody tr:hover{ background:var(--bg-raised); }
             <th class="num">壓力價(距%)</th>
             <th class="num">RS</th>
             <th class="num">持有天數</th>
+            <th>命中條件</th>
           </tr>
         </thead>
-        <tbody id="strategyOpenBody"><tr><td colspan="7"><div class="empty-state">尚無資料。</div></td></tr></tbody>
+        <tbody id="strategyOpenBody"><tr><td colspan="8"><div class="empty-state">尚無資料。</div></td></tr></tbody>
       </table>
     </div>
 
@@ -4193,7 +4194,7 @@ function renderStrategyProgress(daysCollected, instDaysCollected, holderWeeksCol
 function renderStrategyOpen(positions){
   const body = document.getElementById('strategyOpenBody');
   if(!positions || positions.length === 0){
-    body.innerHTML = `<tr><td colspan="7"><div class="empty-state">目前沒有持有中的部位。</div></td></tr>`;
+    body.innerHTML = `<tr><td colspan="8"><div class="empty-state">目前沒有持有中的部位。</div></td></tr>`;
     return;
   }
 
@@ -4204,6 +4205,9 @@ function renderStrategyOpen(positions){
     const rsCell = p.rs != null
       ? `<span class="${pctColor(p.rs)}">${p.rs > 0 ? '+' : ''}${fmt(p.rs,1)}</span>`
       : '—';
+    const criteriaCell = p.matchedCriteria
+      ? `<span style="font-size:11px;color:var(--text-secondary);">${p.matchedCriteria}</span>`
+      : `<span style="font-size:11px;color:var(--text-tertiary);">—（舊資料，尚未記錄）</span>`;
 
     return `
     <tr class="clickable-row" data-code="${p.code}">
@@ -4214,6 +4218,7 @@ function renderStrategyOpen(positions){
       <td class="num">${resistanceCell}</td>
       <td class="num">${rsCell}</td>
       <td class="num">${p.daysHeld} / 3</td>
+      <td>${criteriaCell}</td>
     </tr>`;
   }).join('');
 }
