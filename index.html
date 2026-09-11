@@ -1102,6 +1102,10 @@ tbody tr:hover{ background:var(--bg-raised); }
 
     <div id="strategyProgressPanel" style="margin-bottom:20px;"></div>
 
+    <div style="margin:0 0 10px;font-size:13px;font-weight:700;color:var(--accent);">📋 候選名單（符合條件，等你確認要不要進場）</div>
+    <div class="proxy-status" id="candidatesStatus"></div>
+    <div id="candidatesContainer" style="margin-bottom:20px;"><div class="empty-state">按上面「重新查詢狀態」查看候選名單。</div></div>
+
     <div style="margin:0 0 10px;font-size:13px;font-weight:700;color:var(--accent);">目前持有中（進場後尚未出場）</div>
     <div class="table-wrap" style="margin-bottom:20px;overflow-x:auto;">
       <table>
@@ -4144,9 +4148,94 @@ async function fetchStrategyStatus(){
     renderStrategyOpen(data.openPositions || []);
     renderStrategyClosed(data.closedPositions || []);
     setStrategyStatus('已更新（已累積 ' + data.daysCollected + ' 個交易日的市場快照，法人快照 ' + (data.instDaysCollected || 0) + ' 天，大戶快照 ' + (data.holderWeeksCollected || 0) + ' 週）', 'ok');
+
+    loadCandidates();
   }catch(err){
     setStrategyStatus('抓取失敗：' + err.message, 'error');
   }
+}
+
+// ---------- 候選名單 ----------
+function setCandidatesStatus(text, kind){
+  const el = document.getElementById('candidatesStatus');
+  el.textContent = text;
+  el.className = 'proxy-status' + (kind ? ' ' + kind : '');
+}
+
+async function loadCandidates(){
+  if(!proxyUrl) return;
+  setCandidatesStatus('查詢候選名單中...', '');
+  try{
+    const url = proxyUrl + '?type=getCandidates';
+    const list = await fetchViaJsonp(url, 20000);
+    renderCandidates(list || []);
+    setCandidatesStatus(list && list.length > 0 ? '共 ' + list.length + ' 筆候選待確認' : '目前沒有待確認的候選。', '');
+  }catch(err){
+    setCandidatesStatus('候選名單抓取失敗：' + err.message, 'error');
+  }
+}
+
+function renderCandidates(list){
+  const container = document.getElementById('candidatesContainer');
+  if(!list || list.length === 0){
+    container.innerHTML = '<div class="empty-state">目前沒有待確認的候選股票。</div>';
+    return;
+  }
+
+  container.innerHTML = list.map(c => {
+    const resistanceCell = (c.resistancePrice != null && c.resistancePct != null)
+      ? `${fmt(c.resistancePrice, c.resistancePrice > 1000 ? 0 : 2)}（+${fmt(c.resistancePct,1)}%）`
+      : '—';
+    const rsCell = c.rs != null
+      ? `<span class="${pctColor(c.rs)}">${c.rs > 0 ? '+' : ''}${fmt(c.rs,1)}</span>`
+      : '—';
+
+    return `
+    <div class="table-wrap" style="padding:14px 16px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+        <div>
+          <div><b>${c.name}</b> <span class="code">${c.code}</span>　<span style="font-size:11px;color:var(--text-tertiary);">${c.date} 命中</span></div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">
+            候選價 ${fmt(c.close, c.close > 1000 ? 0 : 2)}　停損 <span class="down-text">${fmt(c.stopLoss, c.stopLoss > 1000 ? 0 : 2)}</span>　壓力價(距%) ${resistanceCell}　RS ${rsCell}
+          </div>
+          <div style="font-size:11px;color:var(--text-tertiary);margin-top:4px;">命中條件：${c.matchedCriteria || '—'}</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-shrink:0;">
+          <button class="confirm-candidate-btn" data-row="${c.rowIndex}" style="background:var(--up);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-weight:700;font-size:12px;cursor:pointer;">確認進場</button>
+          <button class="ignore-candidate-btn tab-btn" data-row="${c.rowIndex}" style="padding:8px 14px;font-size:12px;">忽略</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  container.querySelectorAll('.confirm-candidate-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if(!confirm('確定要用目前即時報價確認進場嗎？')) return;
+      setCandidatesStatus('處理中...', '');
+      try{
+        const url = proxyUrl + '?type=confirmCandidateEntry&rowIndex=' + btn.dataset.row;
+        const result = await fetchViaJsonp(url, 20000);
+        if(!result.ok){ setCandidatesStatus('確認失敗：' + result.error, 'error'); return; }
+        setCandidatesStatus(result.message, 'ok');
+        fetchStrategyStatus();
+      }catch(err){
+        setCandidatesStatus('確認失敗：' + err.message, 'error');
+      }
+    });
+  });
+
+  container.querySelectorAll('.ignore-candidate-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      try{
+        const url = proxyUrl + '?type=ignoreCandidateEntry&rowIndex=' + btn.dataset.row;
+        const result = await fetchViaJsonp(url, 20000);
+        if(!result.ok){ setCandidatesStatus('忽略失敗：' + result.error, 'error'); return; }
+        loadCandidates();
+      }catch(err){
+        setCandidatesStatus('忽略失敗：' + err.message, 'error');
+      }
+    });
+  });
 }
 
 function renderStrategyProgress(daysCollected, instDaysCollected, holderWeeksCollected){
