@@ -654,6 +654,17 @@ tbody tr:hover{ background:var(--bg-raised); }
       <span class="section-eyebrow">01</span>
       <h2>大盤表現</h2>
     </div>
+    <div class="proxy-settings">
+      <input id="proxyUrlInput" placeholder="貼上 GAS Proxy 部署網址 例如 https://script.google.com/macros/s/xxx/exec">
+      <button id="saveProxyBtn">儲存網址</button>
+      <button id="refreshPricesBtn" class="primary">重新整理全部資料</button>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-secondary);cursor:pointer;">
+        <input type="checkbox" id="autoRefreshToggle">
+        自動更新（60秒）
+      </label>
+    </div>
+    <div class="proxy-status" id="proxyStatus"></div>
+
     <div id="indexGrid"></div>
 
     <div style="margin:24px 0 10px;font-size:13px;font-weight:700;color:var(--accent);">三大法人買賣金額趨勢（大盤合計，單位：億元）</div>
@@ -707,16 +718,6 @@ tbody tr:hover{ background:var(--bg-raised); }
       <h2>個人存股表現</h2>
     </div>
 
-    <div class="proxy-settings">
-      <input id="proxyUrlInput" placeholder="貼上 GAS Proxy 部署網址 例如 https://script.google.com/macros/s/xxx/exec">
-      <button id="saveProxyBtn">儲存網址</button>
-      <button id="refreshPricesBtn" class="primary">重新整理全部資料</button>
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-secondary);cursor:pointer;">
-        <input type="checkbox" id="autoRefreshToggle">
-        自動更新（60秒）
-      </label>
-    </div>
-    <div class="proxy-status" id="proxyStatus"></div>
 
     <div id="authPanel" style="margin-bottom:20px;">
       <div class="table-wrap" style="padding:16px;">
