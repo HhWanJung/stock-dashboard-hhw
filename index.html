@@ -2469,7 +2469,8 @@ function renderWatchlist(){
       ? `<span class="${pctColor(changePct)}">${arrow(changePct)} ${changePct > 0 ? '+' : ''}${fmt(changePct,2)}%</span>`
       : '—';
 
-    const industry = (live && live.industry) || '';
+    const isEtfCode = /[A-Za-z]/.test(code) || /^00/.test(code);
+    const industry = (live && live.industry) || (isEtfCode ? 'ETF' : '');
     return `
       <tr>
         <td><div>${name}${industry ? ' <span class="tag">' + industry + '</span>' : ''}</div><div class="code">${code}</div></td>
@@ -2751,7 +2752,8 @@ function renderHoldings(){
       priceCell = '（查無資料）';
     }
 
-    const industry = (live && live.industry) || '';
+    const isEtfCode = /[A-Za-z]/.test(h.code) || /^00/.test(h.code);
+    const industry = (live && live.industry) || (isEtfCode ? 'ETF' : '');
     return `
       <tr>
         <td><div>${name}${industry ? ' <span class="tag">' + industry + '</span>' : ''}</div><div class="code">${h.code}</div></td>
