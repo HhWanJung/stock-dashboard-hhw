@@ -2076,6 +2076,9 @@ async function loadUserDataFromServer(){
       renderWatchlist();
       loadCashFlows();
       loadLineLinkStatus();
+      // 登入前抓的報價清單不包含這個帳號的持股代號，登入後要順便重新查一次，
+      // 這樣「個人存股表現」才會顯示正確的即時報價，不會停留在示範資料
+      if(proxyUrl) refreshAllData();
     }else{
       setAuthStatus('讀取資料失敗：' + result.error, 'error');
     }
