@@ -1584,6 +1584,20 @@ document.getElementById('trendingBody').addEventListener('click', (e) => {
   jumpToKline(row.dataset.code);
 });
 
+document.getElementById('watchlistBody').addEventListener('click', (e) => {
+  if(e.target.closest('.del-btn')) return; // 點刪除按鈕不要順便跳轉
+  const row = e.target.closest('.clickable-row');
+  if(!row) return;
+  jumpToKline(row.dataset.code);
+});
+
+document.getElementById('holdingsBody').addEventListener('click', (e) => {
+  if(e.target.closest('.del-btn')) return; // 點刪除按鈕不要順便跳轉
+  const row = e.target.closest('.clickable-row');
+  if(!row) return;
+  jumpToKline(row.dataset.code);
+});
+
 function switchTab(targetId){
   document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.target === targetId));
   document.querySelectorAll('.page-section').forEach(s => s.classList.toggle('active', s.id === targetId));
@@ -2485,7 +2499,7 @@ function renderWatchlist(){
     const isEtfCode = /[A-Za-z]/.test(code) || /^00/.test(code);
     const industry = (live && live.industry) || (isEtfCode ? 'ETF' : '');
     return `
-      <tr>
+      <tr class="clickable-row" data-code="${code}">
         <td><div>${name}${industry ? ' <span class="tag">' + industry + '</span>' : ''}</div><div class="code">${code}</div></td>
         <td class="num">${priceCell}</td>
         <td class="num">${changeCell}</td>
@@ -2769,7 +2783,7 @@ function renderHoldings(){
     const isEtfCode = /[A-Za-z]/.test(h.code) || /^00/.test(h.code);
     const industry = (live && live.industry) || (isEtfCode ? 'ETF' : '');
     return `
-      <tr>
+      <tr class="clickable-row" data-code="${h.code}">
         <td><div>${name}${industry ? ' <span class="tag">' + industry + '</span>' : ''}</div><div class="code">${h.code}</div></td>
         <td class="num">${fmt(h.shares,0)}</td>
         <td class="num">${fmt(h.cost,2)}</td>
