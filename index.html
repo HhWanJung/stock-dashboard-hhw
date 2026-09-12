@@ -672,6 +672,7 @@ tbody tr:hover{ background:var(--bg-raised); }
         <button class="tab-btn" data-filter="inst_buy">法人買超</button>
         <button class="tab-btn" data-filter="inst_sell">法人賣超</button>
       </div>
+      <div id="trendingDateLabel" style="font-size:11px;color:var(--text-tertiary);padding:8px 4px 0;"></div>
       <table>
         <thead>
           <tr>
@@ -1338,6 +1339,9 @@ let liveGainers = null;
 let liveLosers = null;
 let liveInstBuyers = null;
 let liveInstSellers = null;
+let liveTrendingDate = null;
+let liveMoversDate = null;
+let liveInstDate = null;
 
 function renderTrending(){
   const body = document.getElementById('trendingBody');
@@ -1421,7 +1425,24 @@ document.getElementById('trendingTabs').addEventListener('click', (e) => {
   trendingFilter = btn.dataset.filter;
   document.querySelectorAll('#trendingTabs .tab-btn').forEach(b => b.classList.toggle('active', b === btn));
   renderTrending();
+  renderTrendingDateLabel();
 });
+
+function renderTrendingDateLabel(){
+  const el = document.getElementById('trendingDateLabel');
+  if(!el) return;
+
+  let date = null;
+  if(trendingFilter === 'gainers' || trendingFilter === 'losers'){
+    date = liveMoversDate;
+  }else if(trendingFilter === 'inst_buy' || trendingFilter === 'inst_sell'){
+    date = liveInstDate;
+  }else{
+    date = liveTrendingDate;
+  }
+
+  el.textContent = date ? '資料日期：' + date : '尚未取得資料日期（請先貼上網址並重新整理）';
+}
 
 document.getElementById('trendingBody').addEventListener('click', (e) => {
   const row = e.target.closest('.clickable-row');
@@ -2508,6 +2529,7 @@ async function refreshAllData(){
         vol: item.volume ? Number(item.volume).toLocaleString('zh-Hant-TW') : '—',
         type: item.type
       }));
+      liveTrendingDate = data.trending.date || null;
     }
 
     if(data.movers && !data.movers.error){
@@ -2520,6 +2542,7 @@ async function refreshAllData(){
       });
       if(Array.isArray(data.movers.gainers)) liveGainers = data.movers.gainers.map(mapMover);
       if(Array.isArray(data.movers.losers)) liveLosers = data.movers.losers.map(mapMover);
+      liveMoversDate = data.movers.date || null;
     }
 
     if(data.institutionalRanking && !data.institutionalRanking.error){
@@ -2532,7 +2555,11 @@ async function refreshAllData(){
       });
       if(Array.isArray(data.institutionalRanking.buyers)) liveInstBuyers = data.institutionalRanking.buyers.map(mapRanking);
       if(Array.isArray(data.institutionalRanking.sellers)) liveInstSellers = data.institutionalRanking.sellers.map(mapRanking);
+      liveInstDate = data.institutionalRanking.date || null;
     }
+
+    renderTrendingDateLabel();
+
 
     const now = new Date();
     let statusMsg = '更新於 ' + now.toLocaleTimeString('zh-Hant-TW', { hour12:false });
