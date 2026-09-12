@@ -713,6 +713,7 @@ tbody tr:hover{ background:var(--bg-raised); }
             <th class="num">漲跌幅</th>
             <th class="num">成交張數</th>
             <th>標籤</th>
+            <th></th>
           </tr>
         </thead>
         <tbody id="trendingBody"></tbody>
@@ -1484,11 +1485,11 @@ function renderTrending(){
     const source = trendingFilter === 'gainers' ? liveGainers : liveLosers;
 
     if(!source){
-      body.innerHTML = `<tr><td colspan="5"><div class="empty-state">尚未取得排行資料，請先貼上網址並重新整理。</div></td></tr>`;
+      body.innerHTML = `<tr><td colspan="6"><div class="empty-state">尚未取得排行資料，請先貼上網址並重新整理。</div></td></tr>`;
       return;
     }
     if(source.length === 0){
-      body.innerHTML = `<tr><td colspan="5"><div class="empty-state">今天沒有符合條件的資料。</div></td></tr>`;
+      body.innerHTML = `<tr><td colspan="6"><div class="empty-state">今天沒有符合條件的資料。</div></td></tr>`;
       return;
     }
 
@@ -1499,6 +1500,7 @@ function renderTrending(){
         <td class="num ${pctColor(t.changePct)}">${arrow(t.changePct)} ${t.changePct > 0 ? '+' : ''}${fmt(t.changePct,2)}%</td>
         <td class="num">${t.vol}</td>
         <td><span class="tag">股票</span> <span class="tag">即時（盤後）</span></td>
+        <td><button class="add-watch-btn tab-btn" data-code="${t.code}" style="padding:4px 10px;font-size:12px;">+關注</button></td>
       </tr>`).join('');
     return;
   }
@@ -1507,11 +1509,11 @@ function renderTrending(){
     const source = trendingFilter === 'inst_buy' ? liveInstBuyers : liveInstSellers;
 
     if(!source){
-      body.innerHTML = `<tr><td colspan="5"><div class="empty-state">尚未取得法人買賣超排行，請先貼上網址並重新整理。</div></td></tr>`;
+      body.innerHTML = `<tr><td colspan="6"><div class="empty-state">尚未取得法人買賣超排行，請先貼上網址並重新整理。</div></td></tr>`;
       return;
     }
     if(source.length === 0){
-      body.innerHTML = `<tr><td colspan="5"><div class="empty-state">今天沒有符合條件的資料。</div></td></tr>`;
+      body.innerHTML = `<tr><td colspan="6"><div class="empty-state">今天沒有符合條件的資料。</div></td></tr>`;
       return;
     }
 
@@ -1528,6 +1530,7 @@ function renderTrending(){
         <td class="num">${changeCell}</td>
         <td class="num ${t.net >= 0 ? 'up-text' : 'down-text'}">${t.net > 0 ? '+' : ''}${lots}張</td>
         <td><span class="tag">股票</span> <span class="tag">即時（盤後）</span></td>
+        <td><button class="add-watch-btn tab-btn" data-code="${t.code}" style="padding:4px 10px;font-size:12px;">+關注</button></td>
       </tr>`;
     }).join('');
     return;
@@ -1539,7 +1542,7 @@ function renderTrending(){
   const sourceTag = isLive ? '即時（盤後）' : '示範';
 
   if(filtered.length === 0){
-    body.innerHTML = `<tr><td colspan="5"><div class="empty-state">這個分類目前沒有資料。</div></td></tr>`;
+    body.innerHTML = `<tr><td colspan="6"><div class="empty-state">這個分類目前沒有資料。</div></td></tr>`;
     return;
   }
 
@@ -1550,6 +1553,7 @@ function renderTrending(){
       <td class="num ${pctColor(t.changePct)}">${arrow(t.changePct)} ${t.changePct > 0 ? '+' : ''}${fmt(t.changePct,2)}%</td>
       <td class="num">${t.vol}</td>
       <td><span class="tag">${t.type}</span> <span class="tag">${sourceTag}</span></td>
+      <td><button class="add-watch-btn tab-btn" data-code="${t.code}" style="padding:4px 10px;font-size:12px;">+關注</button></td>
     </tr>`).join('');
 }
 
@@ -1579,6 +1583,11 @@ function renderTrendingDateLabel(){
 }
 
 document.getElementById('trendingBody').addEventListener('click', (e) => {
+  const addBtn = e.target.closest('.add-watch-btn');
+  if(addBtn){
+    addCodeToWatchlist(addBtn.dataset.code);
+    return; // 點「+關注」不要順便跳轉到05個股
+  }
   const row = e.target.closest('.clickable-row');
   if(!row) return;
   jumpToKline(row.dataset.code);
@@ -2522,9 +2531,9 @@ function renderWatchlist(){
   });
 }
 
-document.getElementById('watchAddBtn').addEventListener('click', async () => {
-  const input = document.getElementById('watchInputCode');
-  const code = input.value.trim();
+// 共用：把一支股票加進關注清單（話題個股、關注股票輸入框都會用到）
+async function addCodeToWatchlist(code){
+  code = (code || '').trim();
   if(!code) return;
   if(watchlist.includes(code)){
     alert('這支股票已經在關注清單裡了。');
@@ -2533,12 +2542,18 @@ document.getElementById('watchAddBtn').addEventListener('click', async () => {
   watchlist.push(code);
   await saveWatchlist();
   renderWatchlist();
-  input.value = '';
-  input.focus();
 
   if(proxyUrl){
     refreshAllData();
   }
+}
+
+document.getElementById('watchAddBtn').addEventListener('click', async () => {
+  const input = document.getElementById('watchInputCode');
+  const code = input.value.trim();
+  await addCodeToWatchlist(code);
+  input.value = '';
+  input.focus();
 });
 let livePrices = {};
 let proxyUrl = '';
