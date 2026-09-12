@@ -387,9 +387,15 @@ tbody tr:hover{ background:var(--bg-raised); }
 }
 .tabs{
   display:flex;
+  flex-wrap:nowrap;
   gap:6px;
   padding:10px 14px 0;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:thin;
 }
+.tabs::-webkit-scrollbar{ height:4px; }
+.tabs::-webkit-scrollbar-thumb{ background:var(--hairline); border-radius:2px; }
 .tab-btn{
   background:none;
   border:1px solid var(--hairline);
@@ -399,6 +405,8 @@ tbody tr:hover{ background:var(--bg-raised); }
   font-family:var(--font-sans);
   font-size:13px;
   cursor:pointer;
+  white-space:nowrap;
+  flex-shrink:0;
 }
 .tab-btn.active{
   background:var(--bg-raised);
@@ -931,6 +939,7 @@ tbody tr:hover{ background:var(--bg-raised); }
       <div class="tabs" id="klineMaTabs">
         <button class="tab-btn ma-toggle active" data-ma="5" style="border-color:#5EC8D8;color:#5EC8D8;">MA5</button>
         <button class="tab-btn ma-toggle active" data-ma="10" style="border-color:#C9A227;color:#C9A227;">MA10</button>
+        <button class="tab-btn ma-toggle" data-ma="20" style="border-color:#7FD858;color:#7FD858;">MA20</button>
         <button class="tab-btn ma-toggle" data-ma="30" style="border-color:#B57EDC;color:#B57EDC;">MA30</button>
         <button class="tab-btn ma-toggle" data-ma="60" style="border-color:#E8965A;color:#E8965A;">MA60</button>
       </div>
@@ -946,7 +955,7 @@ tbody tr:hover{ background:var(--bg-raised); }
 
       <div id="klineMaPanel" style="margin-bottom:12px;"></div>
 
-      <div class="table-wrap" style="padding:16px;overflow-x:auto;">
+      <div class="table-wrap" style="padding:16px;">
         <div id="klineChartContainer"><div class="empty-state">輸入股票代號查詢K線圖。</div></div>
       </div>
     </div>
@@ -2859,7 +2868,7 @@ let klinePeriodMonths = 6;
 let klineMaSet = new Set([5, 10]);
 let klineCurrentCode = null;
 let klinePeriodType = 'day'; // 'day' | 'week' | 'month'
-const klineMaColors = { 5:'#5EC8D8', 10:'#C9A227', 30:'#B57EDC', 60:'#E8965A' };
+const klineMaColors = { 5:'#5EC8D8', 10:'#C9A227', 20:'#7FD858', 30:'#B57EDC', 60:'#E8965A' };
 
 function setKlineStatus(text, kind){
   const el = document.getElementById('klineStatus');
@@ -3036,7 +3045,7 @@ function renderMaPanel(){
   const data = aggregateKline(klineData, klinePeriodType);
   const lastClose = data[data.length - 1].close;
   const code = klineCurrentCode;
-  const periods = [5, 10, 30, 60];
+  const periods = [5, 10, 20, 30, 60];
 
   const rows = periods.map(p => {
     const ma = calcMA(data, p);
@@ -3235,14 +3244,15 @@ function renderKlineChart(){
     return 10 + (1 - (p - minP) / priceRange) * (mainH - 20);
   }
 
-  // 水平格線 + 價位數字（6條，含最高最低）
+  // 水平格線（畫在可捲動的圖表本體裡）+ 價位數字（畫在固定不動的縱軸區塊裡，6條，含最高最低）
   const GRID_LINES = 6;
   let hGrid = '';
+  let axisPriceLabels = '';
   for(let i = 0; i <= GRID_LINES; i++){
     const price = minP + (priceRange * i / GRID_LINES);
     const y = yForPrice(price);
     hGrid += `<line x1="${padLeft}" y1="${y}" x2="${w - padRight}" y2="${y}" stroke="#2C303C" stroke-width="1"/>`;
-    hGrid += `<text x="${padLeft - 8}" y="${y + 4}" font-size="11" fill="#8B90A3" font-family="'IBM Plex Mono', monospace" text-anchor="end">${price.toFixed(2)}</text>`;
+    axisPriceLabels += `<text x="${padLeft - 8}" y="${y + 4}" font-size="11" fill="#8B90A3" font-family="'IBM Plex Mono', monospace" text-anchor="end">${price.toFixed(2)}</text>`;
   }
 
   // 垂直格線 + 日期數字（依資料長度抓約 6-8 個點）
@@ -3280,10 +3290,10 @@ function renderKlineChart(){
 
   const volTop = mainH + gap;
   const maxV = Math.max(...data.map(d => d.volume), 1);
-  let vAxisLabels = '';
+  let axisVolLabels = '';
   [0, 0.5, 1].forEach(f => {
     const y = volTop + (volH - 10) * (1 - f) + 5;
-    vAxisLabels += `<text x="${padLeft - 8}" y="${y + 4}" font-size="10" fill="#8B90A3" font-family="'IBM Plex Mono', monospace" text-anchor="end">${Math.round(maxV * f / 1000).toLocaleString('zh-Hant-TW')}張</text>`;
+    axisVolLabels += `<text x="${padLeft - 8}" y="${y + 4}" font-size="10" fill="#8B90A3" font-family="'IBM Plex Mono', monospace" text-anchor="end">${Math.round(maxV * f / 1000).toLocaleString('zh-Hant-TW')}張</text>`;
   });
   const volBars = data.map((d, i) => {
     const x = padLeft + i * candleW;
@@ -3376,18 +3386,23 @@ function renderKlineChart(){
 
   container.innerHTML = `
     <div style="margin-bottom:8px;font-size:12px;font-family:'IBM Plex Mono', monospace;">${legend}<span style="color:#5B6072;">滑鼠移到圖上可看當天詳細數字</span></div>
-    <div style="position:relative;">
-      <div id="klineTooltip" style="position:absolute;display:none;background:#1A1D26;border:1px solid #2C303C;border-radius:6px;padding:10px 12px;font-family:'IBM Plex Mono', monospace;font-size:12px;line-height:1.7;pointer-events:none;z-index:10;white-space:nowrap;color:#8B90A3;box-shadow:0 4px 12px rgba(0,0,0,0.4);"></div>
-      <svg id="klineSvg" width="${w}" height="${totalH}" viewBox="0 0 ${w} ${totalH}" style="display:block;cursor:crosshair;">
-        ${hGrid}
-        ${vGrid}
-        ${candles}
-        ${maLines}
-        ${vAxisLabels}
-        ${volBars}
-        ${indicatorSvg}
-        <line id="klineCrosshairLine" x1="0" y1="0" x2="0" y2="${totalH}" stroke="#C9A227" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"/>
+    <div style="display:flex;position:relative;">
+      <svg width="${padLeft}" height="${totalH}" viewBox="0 0 ${padLeft} ${totalH}" style="display:block;flex-shrink:0;background:var(--bg-surface);">
+        ${axisPriceLabels}
+        ${axisVolLabels}
       </svg>
+      <div id="klineScrollWrap" style="overflow-x:auto;position:relative;flex:1;">
+        <div id="klineTooltip" style="position:absolute;display:none;background:#1A1D26;border:1px solid #2C303C;border-radius:6px;padding:10px 12px;font-family:'IBM Plex Mono', monospace;font-size:12px;line-height:1.7;pointer-events:none;z-index:10;white-space:nowrap;color:#8B90A3;box-shadow:0 4px 12px rgba(0,0,0,0.4);"></div>
+        <svg id="klineSvg" width="${w}" height="${totalH}" viewBox="0 0 ${w} ${totalH}" style="display:block;cursor:crosshair;">
+          ${hGrid}
+          ${vGrid}
+          ${candles}
+          ${maLines}
+          ${volBars}
+          ${indicatorSvg}
+          <line id="klineCrosshairLine" x1="0" y1="0" x2="0" y2="${totalH}" stroke="#C9A227" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"/>
+        </svg>
+      </div>
     </div>`;
 
   klineLayout = { data, padLeft, candleW, w, totalH, indicatorSeries };
@@ -3395,6 +3410,10 @@ function renderKlineChart(){
   const svgEl = document.getElementById('klineSvg');
   svgEl.addEventListener('mousemove', klineHandleMove);
   svgEl.addEventListener('mouseleave', klineHandleLeave);
+
+  // 一進來（或重新查詢）自動把畫面捲到最右邊，也就是最新的日期
+  const scrollWrap = document.getElementById('klineScrollWrap');
+  if(scrollWrap) scrollWrap.scrollLeft = scrollWrap.scrollWidth;
 }
 
 function klineHandleMove(evt){
