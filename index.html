@@ -207,6 +207,13 @@ body{
   display:grid;
   grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
   gap:12px;
+  margin-bottom:20px;
+}
+.index-category-label{
+  font-size:12px;
+  font-weight:700;
+  color:var(--accent);
+  margin-bottom:10px;
 }
 .index-card{
   background:var(--bg-surface);
@@ -647,7 +654,7 @@ tbody tr:hover{ background:var(--bg-raised); }
       <span class="section-eyebrow">01</span>
       <h2>大盤表現</h2>
     </div>
-    <div class="index-grid" id="indexGrid"></div>
+    <div id="indexGrid"></div>
   </div>
 
   <div class="section page-section" id="section-trending">
@@ -1233,15 +1240,19 @@ const priceMap = {
 };
 
 const mockIndices = [
-  { key:'TAIEX', name:'加權指數 TAIEX', value:23568.42, change:186.3, changePct:0.79, spark:[20,40,35,55,50,70,90] },
-  { key:'OTC', name:'櫃買指數 OTC', value:271.4, change:-1.2, changePct:-0.44, spark:[60,55,58,50,45,42,38] },
-  { key:'TXF_DAY', name:'台指期(日盤)', value:23610, change:210, changePct:0.90 },
-  { key:'TXF_NIGHT', name:'台指期(夜盤)', value:23540, change:-70, changePct:-0.30 },
-  { key:'DOW', name:'道瓊工業指數', value:44120.5, change:-85.2, changePct:-0.19 },
-  { key:'NASDAQ', name:'那斯達克指數', value:19850.3, change:120.6, changePct:0.61 },
-  { key:'SP500', name:'S&P 500', value:6210.8, change:-12.4, changePct:-0.20 },
-  { key:'SOX', name:'費城半導體 SOX', value:5890.1, change:62.4, changePct:1.06, spark:[30,35,50,45,60,75,85] },
-  { key:'USDTWD', name:'美元/台幣', value:32.15, change:-0.08, changePct:-0.25, spark:[70,68,65,66,60,58,55] }
+  { key:'TAIEX', name:'加權指數 TAIEX', value:23568.42, change:186.3, changePct:0.79, spark:[20,40,35,55,50,70,90], category:'tw' },
+  { key:'OTC', name:'櫃買指數 OTC', value:271.4, change:-1.2, changePct:-0.44, spark:[60,55,58,50,45,42,38], category:'tw' },
+  { key:'TXF_DAY', name:'台指期(日盤)', value:23610, change:210, changePct:0.90, category:'tw' },
+  { key:'TXF_NIGHT', name:'台指期(夜盤)', value:23540, change:-70, changePct:-0.30, category:'tw' },
+  { key:'DOW', name:'道瓊工業指數', value:44120.5, change:-85.2, changePct:-0.19, category:'us' },
+  { key:'NASDAQ', name:'那斯達克指數', value:19850.3, change:120.6, changePct:0.61, category:'us' },
+  { key:'SP500', name:'S&P 500', value:6210.8, change:-12.4, changePct:-0.20, category:'us' },
+  { key:'SOX', name:'費城半導體 SOX', value:5890.1, change:62.4, changePct:1.06, spark:[30,35,50,45,60,75,85], category:'us' },
+  { key:'USDTWD', name:'美元/台幣', value:32.15, change:-0.08, changePct:-0.25, spark:[70,68,65,66,60,58,55], category:'forex' },
+  { key:'USDJPY', name:'美元/日圓', value:148.32, change:0.42, changePct:0.28, category:'forex' },
+  { key:'EURUSD', name:'歐元/美元', value:1.086, change:-0.003, changePct:-0.28, category:'forex' },
+  { key:'GOLD', name:'黃金', value:2652.3, change:12.8, changePct:0.48, category:'commodity' },
+  { key:'OIL', name:'WTI原油', value:71.25, change:-0.65, changePct:-0.90, category:'commodity' }
 ];
 
 const mockTrending = [
@@ -1291,10 +1302,17 @@ function renderIndices(){
   const grid = document.getElementById('indexGrid');
   const isLive = !!liveIndices;
   const source = liveIndices || mockIndices;
+  const sourceTag = `<span class="tag" style="margin-left:6px;">${isLive ? '即時' : '示範'}</span>`;
 
-  grid.innerHTML = source.map(i => {
+  const categories = [
+    { key: 'tw', label: '🇹🇼 台股' },
+    { key: 'us', label: '🇺🇸 美股' },
+    { key: 'forex', label: '💱 匯率' },
+    { key: 'commodity', label: '🛢️ 原物料' }
+  ];
+
+  const cardHtml = (i) => {
     const hasSpark = Array.isArray(i.spark);
-    const sourceTag = `<span class="tag" style="margin-left:6px;">${isLive ? '即時' : '示範'}</span>`;
     return `
     <div class="index-card">
       <div class="name">${i.name}${sourceTag}</div>
@@ -1304,6 +1322,14 @@ function renderIndices(){
       </div>
       ${hasSpark ? sparkSvg(i.spark, i.change >= 0) : ''}
     </div>`;
+  };
+
+  grid.innerHTML = categories.map(cat => {
+    const items = source.filter(i => i.category === cat.key);
+    if(items.length === 0) return '';
+    return `
+      <div class="index-category-label">${cat.label}</div>
+      <div class="index-grid">${items.map(cardHtml).join('')}</div>`;
   }).join('');
 }
 
@@ -2453,15 +2479,19 @@ async function refreshAllData(){
 
     if(data.indices){
       const mapped = [];
-      if(data.indices.TAIEX) mapped.push({ ...data.indices.TAIEX, key:'TAIEX' });
-      if(data.indices.OTC) mapped.push({ ...data.indices.OTC, key:'OTC' });
-      if(data.indices.SOX) mapped.push({ ...data.indices.SOX, key:'SOX' });
-      if(data.indices.USDTWD) mapped.push({ ...data.indices.USDTWD, key:'USDTWD' });
-      if(data.indices.DOW) mapped.push({ ...data.indices.DOW, key:'DOW' });
-      if(data.indices.NASDAQ) mapped.push({ ...data.indices.NASDAQ, key:'NASDAQ' });
-      if(data.indices.SP500) mapped.push({ ...data.indices.SP500, key:'SP500' });
-      if(data.indices.TXF_DAY) mapped.push({ ...data.indices.TXF_DAY, key:'TXF_DAY' });
-      if(data.indices.TXF_NIGHT) mapped.push({ ...data.indices.TXF_NIGHT, key:'TXF_NIGHT' });
+      if(data.indices.TAIEX) mapped.push({ ...data.indices.TAIEX, key:'TAIEX', category:'tw' });
+      if(data.indices.OTC) mapped.push({ ...data.indices.OTC, key:'OTC', category:'tw' });
+      if(data.indices.TXF_DAY) mapped.push({ ...data.indices.TXF_DAY, key:'TXF_DAY', category:'tw' });
+      if(data.indices.TXF_NIGHT) mapped.push({ ...data.indices.TXF_NIGHT, key:'TXF_NIGHT', category:'tw' });
+      if(data.indices.DOW) mapped.push({ ...data.indices.DOW, key:'DOW', category:'us' });
+      if(data.indices.NASDAQ) mapped.push({ ...data.indices.NASDAQ, key:'NASDAQ', category:'us' });
+      if(data.indices.SP500) mapped.push({ ...data.indices.SP500, key:'SP500', category:'us' });
+      if(data.indices.SOX) mapped.push({ ...data.indices.SOX, key:'SOX', category:'us' });
+      if(data.indices.USDTWD) mapped.push({ ...data.indices.USDTWD, key:'USDTWD', category:'forex' });
+      if(data.indices.USDJPY) mapped.push({ ...data.indices.USDJPY, key:'USDJPY', category:'forex' });
+      if(data.indices.EURUSD) mapped.push({ ...data.indices.EURUSD, key:'EURUSD', category:'forex' });
+      if(data.indices.GOLD) mapped.push({ ...data.indices.GOLD, key:'GOLD', category:'commodity' });
+      if(data.indices.OIL) mapped.push({ ...data.indices.OIL, key:'OIL', category:'commodity' });
       if(mapped.length > 0) liveIndices = mapped;
 
       if(data.indices.TAIEX_ERROR){
