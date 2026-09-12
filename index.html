@@ -2620,7 +2620,8 @@ async function refreshAllData(){
 
   try{
     const requestUrl = proxyUrl + '?type=dashboard&codes=' + encodeURIComponent(codes.join(','));
-    const data = await fetchViaJsonp(requestUrl);
+    // 這個請求後端要做的事情比較多（法人排行、分批股價、國際指數...），給長一點的逾時時間
+    const data = await fetchViaJsonp(requestUrl, 25000);
 
     if(data.quotes){
       livePrices = data.quotes;
