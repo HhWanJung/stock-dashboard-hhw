@@ -905,6 +905,8 @@ tbody tr:hover{ background:var(--bg-raised); }
       <button class="tab-btn" data-subtab="eps">獲利</button>
       <button class="tab-btn" data-subtab="basic">基本資料</button>
       <button class="tab-btn" data-subtab="dividends">除權息</button>
+      <button class="tab-btn" data-subtab="dividendDecisions">股利決議</button>
+      <button class="tab-btn" data-subtab="materialNews">重大訊息</button>
     </div>
 
     <div class="stock-subpanel active" id="subpanel-quote">
@@ -1041,6 +1043,18 @@ tbody tr:hover{ background:var(--bg-raised); }
     <div class="stock-subpanel" id="subpanel-dividends">
       <div class="table-wrap" style="overflow-x:auto;">
         <div id="dividendsContainer"><div class="empty-state">查詢後顯示股利分派紀錄。</div></div>
+      </div>
+    </div>
+
+    <div class="stock-subpanel" id="subpanel-dividendDecisions">
+      <div class="table-wrap" style="overflow-x:auto;">
+        <div id="dividendDecisionsContainer"><div class="empty-state">查詢後顯示股利分派決議（含股東會日期）。</div></div>
+      </div>
+    </div>
+
+    <div class="stock-subpanel" id="subpanel-materialNews">
+      <div class="table-wrap" style="overflow-x:auto;">
+        <div id="materialNewsContainer"><div class="empty-state">查詢後顯示近期重大訊息。</div></div>
       </div>
     </div>
   </div>
@@ -1800,6 +1814,8 @@ function queryStock(code){
   fetchKline(code);
   fetchInstitutional(code);
   fetchFundamental(code);
+  fetchMaterialNews(code);
+  fetchDividendDecisions(code);
   addToCompare(code);
 }
 
@@ -3693,6 +3709,77 @@ function renderGenericTable(container, rows, emptyMsg){
 
 function renderDividends(dividends){
   renderGenericTable(document.getElementById('dividendsContainer'), dividends, '查無股利分派資料。');
+}
+
+// ---------- 重大訊息 ----------
+async function fetchMaterialNews(code){
+  const container = document.getElementById('materialNewsContainer');
+  container.innerHTML = '<div class="empty-state">抓取中...</div>';
+  if(!proxyUrl) return;
+
+  try{
+    const url = proxyUrl + '?type=materialAnnouncements&code=' + encodeURIComponent(code);
+    const list = await fetchViaJsonp(url, 20000);
+    if(list && list.error){
+      container.innerHTML = errorStateHtml(list.error);
+      return;
+    }
+    if(!Array.isArray(list) || list.length === 0){
+      container.innerHTML = '<div class="empty-state">近期查無重大訊息。</div>';
+      return;
+    }
+    container.innerHTML = list.map(n => `
+      <div style="padding:12px 0;border-bottom:1px solid var(--hairline);">
+        <div style="font-size:11px;color:var(--text-tertiary);">${n.announceDate}　${n.clause}</div>
+        <div style="font-size:13px;font-weight:700;margin:4px 0;white-space:pre-wrap;">${n.subject}</div>
+        <details style="font-size:12px;color:var(--text-secondary);">
+          <summary style="cursor:pointer;color:var(--accent);">展開說明</summary>
+          <div style="white-space:pre-wrap;margin-top:6px;">${n.detail}</div>
+        </details>
+      </div>`).join('');
+  }catch(err){
+    container.innerHTML = errorStateHtml('抓取失敗：' + err.message);
+  }
+}
+
+// ---------- 股利分派決議（含股東會日期）----------
+async function fetchDividendDecisions(code){
+  const container = document.getElementById('dividendDecisionsContainer');
+  container.innerHTML = '<div class="empty-state">抓取中...</div>';
+  if(!proxyUrl) return;
+
+  try{
+    const url = proxyUrl + '?type=dividendDecisions&code=' + encodeURIComponent(code);
+    const list = await fetchViaJsonp(url, 20000);
+    if(list && list.error){
+      container.innerHTML = errorStateHtml(list.error);
+      return;
+    }
+    if(!Array.isArray(list) || list.length === 0){
+      container.innerHTML = '<div class="empty-state">查無股利分派決議資料。</div>';
+      return;
+    }
+    const rows = list.map(d => `
+      <tr>
+        <td>${d.year}</td>
+        <td>${d.period}</td>
+        <td>${d.progress}</td>
+        <td>${d.meetingDate || '—'}</td>
+        <td class="num">${fmt(d.cashDividend,4)}</td>
+        <td class="num">${fmt(d.capitalCash,4)}</td>
+        <td class="num">${d.stockDividendShares ? d.stockDividendShares.toLocaleString('zh-Hant-TW') : '—'}</td>
+      </tr>`).join('');
+    container.innerHTML = `
+      <table>
+        <thead><tr>
+          <th>股利年度</th><th>所屬期間</th><th>決議進度</th><th>股東會日期</th>
+          <th class="num">現金股利(元/股)</th><th class="num">資本公積現金(元/股)</th><th class="num">配股總股數</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }catch(err){
+    container.innerHTML = errorStateHtml('抓取失敗：' + err.message);
+  }
 }
 
 // 把 "11507" 這種5位數民國年月字串轉成 "2026-07"
