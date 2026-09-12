@@ -655,6 +655,19 @@ tbody tr:hover{ background:var(--bg-raised); }
       <h2>大盤表現</h2>
     </div>
     <div id="indexGrid"></div>
+
+    <div style="margin:24px 0 10px;font-size:13px;font-weight:700;color:var(--accent);">三大法人買賣金額趨勢（大盤合計，單位：億元）</div>
+    <div class="table-wrap" style="padding:16px;">
+      <div class="tabs" id="instTrendTabs">
+        <button class="tab-btn active" data-series="totalNet">三大法人合計</button>
+        <button class="tab-btn" data-series="foreignNet">外資及陸資</button>
+        <button class="tab-btn" data-series="trustNet">投信</button>
+        <button class="tab-btn" data-series="dealerNet">自營商</button>
+      </div>
+      <button id="instTrendRefreshBtn" class="tab-btn" style="margin:10px 0;">查詢趨勢</button>
+      <div class="proxy-status" id="instTrendStatus"></div>
+      <div id="instTrendContainer"><div class="empty-state">按「查詢趨勢」查看資料。</div></div>
+    </div>
   </div>
 
   <div class="section page-section" id="section-trending">
@@ -1333,6 +1346,103 @@ function renderIndices(){
       <div class="index-grid">${items.map(cardHtml).join('')}</div>`;
   }).join('');
 }
+
+// ---------- 三大法人買賣金額趨勢 ----------
+let instTrendData = null;
+let instTrendSeries = 'totalNet';
+
+function setInstTrendStatus(text, kind){
+  const el = document.getElementById('instTrendStatus');
+  el.textContent = text;
+  el.className = 'proxy-status' + (kind ? ' ' + kind : '');
+}
+
+document.getElementById('instTrendTabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('.tab-btn');
+  if(!btn) return;
+  instTrendSeries = btn.dataset.series;
+  document.querySelectorAll('#instTrendTabs .tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+  if(instTrendData) renderInstTrendChart(instTrendData);
+});
+
+document.getElementById('instTrendRefreshBtn').addEventListener('click', async () => {
+  if(!proxyUrl){
+    setInstTrendStatus('請先在「個人存股表現」區塊貼上並儲存 GAS proxy 網址。', 'error');
+    return;
+  }
+  setInstTrendStatus('查詢中...', '');
+  try{
+    const url = proxyUrl + '?type=getMarketInstitutionalTrend';
+    const list = await fetchViaJsonp(url, 20000);
+    instTrendData = list || [];
+    if(instTrendData.length === 0){
+      document.getElementById('instTrendContainer').innerHTML = '<div class="empty-state">目前還沒有累積任何資料，系統每天下午會自動記錄一次，明天再回來看看。</div>';
+      setInstTrendStatus('尚無資料。', '');
+      return;
+    }
+    renderInstTrendChart(instTrendData);
+    setInstTrendStatus('已更新（共 ' + instTrendData.length + ' 個交易日資料）', 'ok');
+  }catch(err){
+    setInstTrendStatus('抓取失敗：' + err.message, 'error');
+  }
+});
+
+function renderInstTrendChart(data){
+  const container = document.getElementById('instTrendContainer');
+  const recent = data.slice(-20); // 只顯示最近20個交易日，跟參考畫面的呈現方式類似
+
+  const seriesLabels = { totalNet: '三大法人合計', foreignNet: '外資及陸資', trustNet: '投信', dealerNet: '自營商' };
+  const values = recent.map(d => d[instTrendSeries] || 0);
+
+  const w = Math.max(600, recent.length * 40);
+  const h = 260;
+  const padLeft = 60, padRight = 14, padTop = 20, padBottom = 30;
+  const plotW = w - padLeft - padRight;
+  const plotH = h - padTop - padBottom;
+
+  const maxAbs = Math.max(...values.map(Math.abs), 1);
+  const zeroY = padTop + plotH / 2;
+  const yFor = (v) => zeroY - (v / maxAbs) * (plotH / 2);
+  const barWidth = Math.min(28, plotW / recent.length * 0.6);
+  const xFor = (i) => padLeft + (i + 0.5) / recent.length * plotW;
+
+  let gridHtml = '';
+  [-maxAbs, 0, maxAbs].forEach(v => {
+    const y = yFor(v);
+    gridHtml += `<line x1="${padLeft}" y1="${y}" x2="${w-padRight}" y2="${y}" stroke="#2C303C" stroke-width="1"/>`;
+    gridHtml += `<text x="${padLeft-8}" y="${y+4}" font-size="10" fill="#8B90A3" font-family="'IBM Plex Mono', monospace" text-anchor="end">${v.toFixed(0)}</text>`;
+  });
+
+  const barsHtml = recent.map((d, i) => {
+    const v = d[instTrendSeries] || 0;
+    const x = xFor(i) - barWidth / 2;
+    const y = Math.min(yFor(v), zeroY);
+    const barH = Math.abs(yFor(v) - zeroY);
+    const color = v >= 0 ? 'var(--up)' : 'var(--down)';
+    return `<rect x="${x}" y="${y}" width="${barWidth}" height="${Math.max(barH,1)}" fill="${color}" rx="2"/>`;
+  }).join('');
+
+  const idxs = recent.length <= 10 ? recent.map((_, i) => i) : [0, Math.floor(recent.length/2), recent.length-1];
+  let xLabels = '';
+  idxs.forEach(i => {
+    xLabels += `<text x="${xFor(i)}" y="${h-10}" font-size="10" fill="#8B90A3" font-family="'IBM Plex Mono', monospace" text-anchor="middle">${recent[i].date.slice(5)}</text>`;
+  });
+
+  const latest = recent[recent.length - 1];
+  const latestVal = latest[instTrendSeries] || 0;
+
+  container.innerHTML = `
+    <div style="font-size:12px;margin-bottom:8px;">
+      ${seriesLabels[instTrendSeries]}　最新（${latest.date}）：<span class="${pctColor(latestVal)}">${latestVal > 0 ? '+' : ''}${fmt(latestVal,2)} 億元</span>
+    </div>
+    <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block;">
+      ${gridHtml}
+      ${barsHtml}
+      ${xLabels}
+    </svg>
+    <div style="margin-top:6px;font-size:11px;color:var(--text-tertiary);">資料來源：證交所三大法人買賣金額統計表，每天下午自動記錄一次，只顯示最近20個交易日。</div>`;
+}
+
 
 let trendingFilter = 'all';
 let liveGainers = null;
